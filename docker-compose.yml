@@ -1,0 +1,13 @@
+services:
+  generic-data-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: generic-data-mcp:dev
+    stdin_open: true   # required: keeps stdin open for MCP stdio transport
+    tty: false         # required: TTY would corrupt MCP JSON-RPC framing on stdout
+    volumes:
+      - ./data:/data   # persists DB; exposes host ./data to ingest_file
+    environment:
+      MCP_DB_PATH: /data/store.db
+      MCP_ALLOWED_DIRS: /data
