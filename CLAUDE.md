@@ -26,20 +26,6 @@ This is an MCP server that ingests structured files (CSV, TSV, pipe-delimited, J
 
 **Dependency graph (wired in `server.py`):**
 
-```
-Config (env vars)
-  └─ MCPServer
-       ├─ SQLiteStore (owns the sqlite3 connection)
-       │    ├─ TableManager     (DDL: create/drop/describe tables)
-       │    ├─ DataIngestor     (streaming batched INSERT)
-       │    ├─ QueryExecutor    (read-only SELECT, 1000-row cap)
-       │    ├─ SearchIndex      (FTS5 opt-in per table+columns)
-       │    └─ MetadataStore    (dataset registry table)
-       ├─ ParserRegistry        (dispatches to BaseParser subclasses by extension)
-       ├─ PathValidator         (enforces MCP_ALLOWED_DIRS)
-       ├─ SQLValidator          (sqlglot-based: SELECT-only, single-statement)
-       └─ ToolRegistry          (holds BaseTool subclasses, dispatched by name)
-```
 
 **Key design decisions:**
 
