@@ -78,31 +78,33 @@ This is an MCP server that ingests structured files (CSV, TSV, pipe-delimited, J
  LABEL org.opencontainers.image.title="generic-data-mcp" \
        org.opencontainers.image.description="MCP server: structured files → SQLite → LLM tools"
 
- RUN apt-get update \
-     && apt-get install -y --no-install-recommends sqlite3 \
-     && rm -rf /var/lib/apt/lists/*
-
- RUN useradd --uid 1000 --create-home --shell /bin/bash mcp
+ # no-login shell; sqlite3 CLI omitted (use a separate ephemeral container to inspect DB)
+ RUN useradd --uid 1000 --create-home --shell /usr/sbin/nologin mcp
 
  WORKDIR /app
  COPY pyproject.toml ./
  COPY src/ ./src/
  RUN pip install --no-cache-dir .
 
- RUN mkdir -p /data && chown mcp:mcp /data
+ # /data -- user files (ingest_file reads from here)
+ # /db   -- SQLite DB on a separate volume, outside the ingest-allowed tree
+ RUN mkdir -p /data /db && chown mcp:mcp /data /db
  VOLUME /data
+ VOLUME /db
 
- ENV MCP_DB_PATH=/data/store.db \
+ ENV MCP_DB_PATH=/db/store.db \
      MCP_ALLOWED_DIRS=/data
 
  USER mcp
  ENTRYPOINT ["generic-data-mcp"]
 
  Key decisions:
- - Single-stage (no multi-stage needed — pure Python, nothing to compile)
- - sqlite3 CLI included for interactive DB inspection (docker run --entrypoint sqlite3 ...)
- - Non-root mcp user (uid 1000); /data pre-owned so volume writes work without runtime chown
- - pip install . (not editable) — installs the src.server:main entry point to /usr/local/bin/generic-data-mcp
+ - Single-stage (no multi-stage needed -- pure Python, nothing to compile)
+ - No extra packages -- sqlite3 CLI available via a separate ephemeral container
+ - Non-root mcp user (uid 1000) with nologin shell; /data and /db pre-owned
+ - DB lives at /db (separate volume) so the SQLite file is outside the ingest-allowed tree
+ - pip install . (not editable) -- installs the src.server:main entry point to /usr/local/bin/generic-data-mcp
+ - Pin base image to a digest: docker pull python:3.11-slim && docker inspect python:3.11-slim --format='{{index .RepoDigests 0}}'
 
  2. docker-compose.yml
 
@@ -114,11 +116,25 @@ This is an MCP server that ingests structured files (CSV, TSV, pipe-delimited, J
      image: generic-data-mcp:dev
      stdin_open: true   # required: keeps stdin open for MCP stdio transport
      tty: false         # required: TTY would corrupt MCP JSON-RPC framing on stdout
+     network_mode: "none"
+     read_only: true
+     security_opt:
+       - "no-new-privileges:true"
+     cap_drop:
+       - ALL
+     mem_limit: 512m
+     pids_limit: 128
+     tmpfs:
+       - /tmp:size=64m,mode=1777
      volumes:
-       - ./data:/data   # persists DB; exposes host ./data to ingest_file
+       - ./data:/data   # user files for ingest_file
+       - db-data:/db    # SQLite DB isolated from ingest-allowed tree
      environment:
-       MCP_DB_PATH: /data/store.db
+       MCP_DB_PATH: /db/store.db
        MCP_ALLOWED_DIRS: /data
+
+ volumes:
+   db-data:
 
  Note: use docker compose run --rm generic-data-mcp for interactive sessions, not up.
 
@@ -154,8 +170,10 @@ This is an MCP server that ingests structured files (CSV, TSV, pipe-delimited, J
        "command": "docker",
        "args": [
          "run", "--rm", "-i",
+         "--network", "none",
          "-v", "/absolute/path/to/data:/data",
-         "-e", "MCP_DB_PATH=/data/store.db",
+         "-v", "/absolute/path/to/db:/db",
+         "-e", "MCP_DB_PATH=/db/store.db",
          "-e", "MCP_ALLOWED_DIRS=/data",
          "generic-data-mcp:latest"
        ]
@@ -170,15 +188,14 @@ This is an MCP server that ingests structured files (CSV, TSV, pipe-delimited, J
  # Build
  docker build -t generic-data-mcp:latest .
 
- # Smoke test (server starts, exits on EOF — correct behaviour)
- echo '{}' | docker run --rm -i -v "$(pwd)/data:/data" generic-data-mcp:latest
+ # Smoke test (server starts, exits on EOF -- correct behaviour)
+ echo '{}' | docker run --rm -i --network none -v "$(pwd)/data:/data" -v "$(pwd)/db:/db" generic-data-mcp:latest
 
  # Run tests against host Python (tests don't need Docker)
  python -m pytest tests/ -v
 
- # Inspect DB after a session
- docker run --rm -it -v "$(pwd)/data:/data" \
-   --entrypoint sqlite3 generic-data-mcp:latest /data/store.db ".tables"
+ # Inspect DB after a session (ephemeral container; not the production image)
+ docker run --rm -it -v "$(pwd)/db:/db" --entrypoint sqlite3 python:3.11-slim /db/store.db ".tables"
 
  Critical Files (read before implementing)
 

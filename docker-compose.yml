@@ -6,8 +6,22 @@ services:
     image: generic-data-mcp:dev
     stdin_open: true   # required: keeps stdin open for MCP stdio transport
     tty: false         # required: TTY would corrupt MCP JSON-RPC framing on stdout
+    network_mode: "none"
+    read_only: true
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    mem_limit: 512m
+    pids_limit: 128
+    tmpfs:
+      - /tmp:size=64m,mode=1777
     volumes:
-      - ./data:/data   # persists DB; exposes host ./data to ingest_file
+      - ./data:/data   # user files; ingest_file reads from here
+      - db-data:/db    # SQLite DB isolated from ingest-allowed tree
     environment:
-      MCP_DB_PATH: /data/store.db
+      MCP_DB_PATH: /db/store.db
       MCP_ALLOWED_DIRS: /data
+
+volumes:
+  db-data:
