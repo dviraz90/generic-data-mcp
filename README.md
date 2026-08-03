@@ -30,7 +30,7 @@ An MCP server that ingests structured data files (CSV, TSV, pipe-delimited, JSON
 
 **FTS5 is opt-in.** Auto-indexing every table doubles storage. Instead, the `search` tool's `enable` action lets the LLM (or user) index a specific (table, columns) pair. Triggers keep the index in sync with the source table.
 
-## With more time
+## Future features
 
 - **More parsers**: Excel (openpyxl), Parquet, YAML, TOML, fixed-width text
 - **Vector search**: add `sqlite-vec` so the LLM can search by meaning, not just keywords
