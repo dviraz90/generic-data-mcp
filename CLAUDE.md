@@ -31,7 +31,7 @@ This is an MCP server that ingests structured files (CSV, TSV, pipe-delimited, J
 
 - **All collaborators are constructor-injected** — no globals, no singletons, no module-level state. Every class is independently testable (see `test_e2e.py` which builds a real `SQLiteStore` against `tmp_path`).
 - **Parsers yield `dict[str, str]`** — raw strings only. Type inference happens in the storage layer (`TypeInferrer` in `storage/types.py`), not in parsers. Samples 200 rows; a column becomes INTEGER/REAL only if every non-empty value parses cleanly.
-- **`server.py` is the only MCP boundary** — the `@server.list_tools()` and `@server.call_tool()` decorators live there and delegate immediately to `ToolRegistry`. Tool classes know nothing about MCP.
+- **`server.py` is the only MCP boundary** — `MCPServer` wires the dependency graph and registers `on_list_tools`/`on_call_tool` callbacks with the `mcp` SDK's lowlevel `Server` (the installed `mcp>=1.0` resolves to 2.x, which uses constructor-passed callbacks rather than the older `@server.list_tools()` decorator style). Both callbacks delegate immediately to `ToolRegistry`. Tool classes know nothing about MCP.
 - **Tool errors are written for LLM recovery** — `ToolResult.fail(error)` messages tell the LLM what to do next (e.g., "call describe_table first"). `ToolResult.ok(**data)` wraps the success payload.
 - **SQL safety uses sqlglot AST walking** — not regex. Allows SELECT/WITH…SELECT/UNION; rejects everything else including `PRAGMA`/`ATTACH` via `exp.Command`.
 - **FTS5 is opt-in** — the `search` tool's `enable` action creates the FTS5 virtual table and triggers for a specific (table, columns) pair. Not auto-created on ingest.
