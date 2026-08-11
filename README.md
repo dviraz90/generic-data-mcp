@@ -22,7 +22,7 @@ An MCP server that ingests structured data files (CSV, TSV, pipe-delimited, JSON
 
 **SQL safety.** I pass user/LLM SQL through `sqlglot` (a real parser, not regex), reject any non-SELECT, reject multi-statement queries, and walk the AST for forbidden node types as defense-in-depth. Identifiers passed through other tools (`table_name`, columns) are validated against `[A-Za-z_][A-Za-z0-9_]*` even though I always quote them.
 
-**Path safety.** `ingest_file` only accepts paths under `MCP_ALLOWED_DIRS`. Paths are resolved (`Path.resolve()`) before the check, so symlinks and `..` traversal can't escape. Belt-and-braces against the LLM passing `/etc/passwd` or similar.
+**Path safety.** `ingest_file` only accepts paths under `MCP_ALLOWED_DIRS`, and the SQLite store is required to live outside that tree. Paths are resolved (`Path.resolve()`) before the check, so symlinks and `..` traversal can't escape. Belt-and-braces against the LLM passing `/etc/passwd` or similar.
 
 **Type inference is conservative.** Sample 200 rows; a column is INTEGER only if every non-empty value parses as int, REAL if every value parses as a number, otherwise TEXT. Booleans are intentionally NOT coerced to integers — too easy to lose semantics.
 
@@ -42,8 +42,23 @@ An MCP server that ingests structured data files (CSV, TSV, pipe-delimited, JSON
 
 ```bash
 pip install -e .
-MCP_DB_PATH=./data/store.db MCP_ALLOWED_DIRS=./data generic-data-mcp
+MCP_DB_PATH=./db/store.db MCP_ALLOWED_DIRS=./data generic-data-mcp
 ```
+
+The database must live **outside** every directory in `MCP_ALLOWED_DIRS`. `Config.from_env()`
+refuses to start otherwise — if the store sits inside the ingest tree, `ingest_file` can be
+pointed at the store itself and read every other dataset back out.
+
+### Docker
+
+```bash
+docker build -t generic-data-mcp:latest .
+docker compose run --rm generic-data-mcp
+```
+
+The image runs as a non-root user with a nologin shell, and compose adds `network_mode: none`,
+`read_only`, `cap_drop: ALL`, `no-new-privileges`, and memory/PID limits. `/data` holds user
+files; the SQLite store is on a separate `/db` volume.
 
 ## Client configuration
 
@@ -57,7 +72,7 @@ Any MCP-compatible client works. The server communicates over **stdio** — the 
     "generic-data-mcp": {
       "command": "generic-data-mcp",
       "env": {
-        "MCP_DB_PATH": "/absolute/path/to/store.db",
+        "MCP_DB_PATH": "/absolute/path/to/db/store.db",
         "MCP_ALLOWED_DIRS": "/absolute/path/to/data"
       }
     }
@@ -73,7 +88,7 @@ Any MCP-compatible client works. The server communicates over **stdio** — the 
     "generic-data-mcp": {
       "command": "generic-data-mcp",
       "env": {
-        "MCP_DB_PATH": "/absolute/path/to/store.db",
+        "MCP_DB_PATH": "/absolute/path/to/db/store.db",
         "MCP_ALLOWED_DIRS": "/absolute/path/to/data"
       }
     }
@@ -89,7 +104,7 @@ Any MCP-compatible client works. The server communicates over **stdio** — the 
     "generic-data-mcp": {
       "command": "generic-data-mcp",
       "env": {
-        "MCP_DB_PATH": "/absolute/path/to/store.db",
+        "MCP_DB_PATH": "/absolute/path/to/db/store.db",
         "MCP_ALLOWED_DIRS": "/absolute/path/to/data"
       }
     }
