@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "MCP server that ingests structured files into SQLite and exposes them as queryable tools."
 requires-python = ">=3.11"
 dependencies = [
-    "mcp>=1.10",
+    "mcp>=2.0,<3",
     "sqlglot>=26,<27",
 ]
 
