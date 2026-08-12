@@ -9,3 +9,7 @@ venv/
 .coverage
 data/
 .DS_Store
+.env
+*.env
+*.pem
+*.key
