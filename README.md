@@ -112,6 +112,27 @@ Any MCP-compatible client works. The server communicates over **stdio** — the 
 }
 ```
 
+**Docker** — swap the `command`/`args` pair into any of the configs above (Claude Desktop and Cursor use `mcpServers`, VS Code uses `servers`) to run the containerized server instead of a local install:
+
+```json
+{
+  "mcpServers": {
+    "generic-data-mcp": {
+      "command": "docker",
+      "args": [
+        "run", "--rm", "-i",
+        "--network", "none",
+        "-v", "/absolute/path/to/data:/data",
+        "-v", "/absolute/path/to/db:/db",
+        "-e", "MCP_DB_PATH=/db/store.db",
+        "-e", "MCP_ALLOWED_DIRS=/data",
+        "generic-data-mcp:latest"
+      ]
+    }
+  }
+}
+```
+
 ## Layout
 
 ```
