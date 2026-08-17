@@ -111,7 +111,7 @@
 <body>
   <header>
     <h1>generic-data-mcp — Ingestion Console</h1>
-    <p>Upload structured files (CSV, TSV, JSON, JSONL), browse loaded tables, and run read-only SELECT queries.</p>
+    <p>Upload structured files (CSV, TSV, pipe, JSON, JSONL, XLSX), browse loaded tables, and run read-only SELECT queries.</p>
   </header>
   <main>
     <div class="panel stack">
@@ -119,8 +119,8 @@
         <h2>Upload</h2>
         <div id="drop">
           <strong>Drop a file here</strong> or click to choose<br />
-          <span style="font-size:12px">CSV · TSV · pipe · JSON · JSONL</span>
-          <input id="file" type="file" hidden />
+          <span style="font-size:12px">CSV · TSV · pipe · JSON · JSONL · XLSX</span>
+          <input id="file" type="file" accept=".csv,.tsv,.psv,.pipe,.json,.jsonl,.ndjson,.xlsx" hidden />
         </div>
         <label for="tableName">Table name (optional — derived from filename)</label>
         <input id="tableName" type="text" placeholder="e.g. orders" />
