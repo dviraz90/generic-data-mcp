@@ -12,7 +12,7 @@ from src.validators.path import PathValidator
 class IngestFileTool(BaseTool):
     name = "ingest_file"
     description = (
-        "Parse a structured file (CSV, TSV, pipe-delimited, JSON, JSONL) and load it "
+        "Parse a structured file (CSV, TSV, pipe-delimited, JSON, JSONL, XLSX) and load it "
         "into a new SQLite table. Call this before query/describe_table/search on a "
         "dataset that hasn't been loaded yet. Choose a short, descriptive table_name "
         "(e.g. 'orders', 'users') matching [A-Za-z_][A-Za-z0-9_]*."

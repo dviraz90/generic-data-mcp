@@ -27,6 +27,22 @@ _FORBIDDEN_NODE_TYPES = (
 )
 
 
+def normalize_identifier(name: str) -> str:
+    """Coerce an arbitrary column/table header into a valid identifier.
+
+    Runs of characters outside [A-Za-z0-9_] collapse to a single underscore,
+    surrounding underscores are trimmed, and a leading digit is prefixed with an
+    underscore. Already-valid names pass through unchanged. Returns "" when no
+    usable characters remain (callers substitute a positional fallback).
+    """
+    cleaned = re.sub(r"[^A-Za-z0-9_]+", "_", name).strip("_")
+    if not cleaned:
+        return ""
+    if cleaned[0].isdigit():
+        cleaned = "_" + cleaned
+    return cleaned
+
+
 def validate_identifier(name: str) -> str:
     """Validates a table/column identifier before it's interpolated into SQL.
 

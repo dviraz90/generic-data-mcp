@@ -93,6 +93,28 @@ def test_ingest_duplicate_table_name_fails(workspace):
     assert "already exists" in result.error
 
 
+def test_ingest_headers_with_spaces_are_normalized(workspace):
+    registry, csv_path = workspace
+    # Headers with spaces/punctuation (common in spreadsheet exports) must not
+    # fail identifier validation — they are coerced to valid column names.
+    csv_path.write_text(
+        "Flights coming home pg ,Dep Time\n"
+        "AA123,08:00\n"
+        "BA456,09:30\n"
+    )
+
+    ingest_result = registry.call("ingest_file", {"path": str(csv_path), "table_name": "flights"})
+    assert ingest_result.success, ingest_result.error
+    names = [c["name"] for c in ingest_result.data["columns"]]
+    assert names == ["Flights_coming_home_pg", "Dep_Time"]
+
+    query_result = registry.call(
+        "query", {"sql": 'SELECT "Flights_coming_home_pg" FROM flights ORDER BY "Dep_Time"'}
+    )
+    assert query_result.success, query_result.error
+    assert query_result.data["rows"] == [["AA123"], ["BA456"]]
+
+
 def test_describe_table_unknown_table_fails(workspace):
     registry, _ = workspace
     result = registry.call("describe_table", {"table_name": "does_not_exist"})

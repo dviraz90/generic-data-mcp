@@ -7,10 +7,32 @@ from typing import Iterator
 from src.exceptions import GenericDataMCPError
 from src.storage.metadata import MetadataStore
 from src.storage.tables import TableManager
-from src.storage.types import TableSchema, TypeInferrer
-from src.validators.sql import validate_identifier
+from src.storage.types import ColumnSchema, TableSchema, TypeInferrer
+from src.validators.sql import normalize_identifier, validate_identifier
 
 _BATCH_SIZE = 1000
+
+
+def _normalize_columns(headers: list[str]) -> list[str]:
+    """Map raw file headers to unique, valid SQL column identifiers, in order.
+
+    Headers with spaces or punctuation (common in spreadsheets, e.g. a title row
+    like 'Flights coming home') are coerced via ``normalize_identifier``; empty
+    or unusable headers fall back to positional 'column_N'; collisions get a
+    numeric suffix so every column stays distinct.
+    """
+    result: list[str] = []
+    seen: set[str] = set()
+    for index, header in enumerate(headers):
+        candidate = normalize_identifier(header) or f"column_{index + 1}"
+        unique = candidate
+        suffix = 2
+        while unique in seen:
+            unique = f"{candidate}_{suffix}"
+            suffix += 1
+        seen.add(unique)
+        result.append(unique)
+    return result
 
 
 class DataIngestor:
@@ -47,20 +69,25 @@ class DataIngestor:
         if not sample_rows:
             raise GenericDataMCPError(f"'{source_path}' contains no rows to ingest.")
 
-        column_order = list(sample_rows[0].keys())
-        inferred = self._inferrer.infer(sample_rows, column_order)
-        schema = TableSchema(name=table_name, columns=inferred.columns)
+        source_order = list(sample_rows[0].keys())
+        column_names = _normalize_columns(source_order)
+        inferred = self._inferrer.infer(sample_rows, source_order)
+        columns = tuple(
+            ColumnSchema(name=name, sql_type=col.sql_type)
+            for name, col in zip(column_names, inferred.columns)
+        )
+        schema = TableSchema(name=table_name, columns=columns)
 
         self._tables.create_table(schema)
 
-        quoted_columns = ", ".join(f'"{c}"' for c in column_order)
-        placeholders = ", ".join("?" for _ in column_order)
+        quoted_columns = ", ".join(f'"{c}"' for c in column_names)
+        placeholders = ", ".join("?" for _ in column_names)
         insert_sql = f'INSERT INTO "{table_name}" ({quoted_columns}) VALUES ({placeholders})'
 
         row_count = 0
         try:
             for batch in self._batched(itertools.chain(sample_rows, rows), _BATCH_SIZE):
-                values = [tuple(row.get(col, "") for col in column_order) for row in batch]
+                values = [tuple(row.get(col, "") for col in source_order) for row in batch]
                 self._conn.executemany(insert_sql, values)
                 row_count += len(values)
             self._conn.commit()

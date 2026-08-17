@@ -49,6 +49,30 @@ The database must live **outside** every directory in `MCP_ALLOWED_DIRS`. `Confi
 refuses to start otherwise — if the store sits inside the ingest tree, `ingest_file` can be
 pointed at the store itself and read every other dataset back out.
 
+### Local upload GUI
+
+A local **ingestion console** — drag-and-drop upload (including XLSX), browse loaded datasets,
+preview schemas, and run SELECT queries — for humans, over plain HTTP on `127.0.0.1`. It shares
+the same SQLite DB and `data/` tree as the MCP server; the MCP protocol is unchanged.
+
+```bash
+pip install -e ".[ui]"
+MCP_DB_PATH=./db/store.db MCP_ALLOWED_DIRS=./data generic-data-mcp-ui
+```
+
+On startup the console prints the link it's serving on and opens your browser to it:
+
+```
+  generic-data-mcp upload console is running at:
+
+      http://127.0.0.1:8765/
+
+  Open it in your browser (Ctrl+C to stop).
+```
+
+Override the port with `MCP_UI_PORT` (the printed link updates to match). Uploaded files are
+saved under `<first allowed dir>/uploads/` (e.g. `./data/uploads/`).
+
 ### Docker
 
 ```bash

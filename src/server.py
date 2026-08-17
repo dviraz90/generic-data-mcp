@@ -8,18 +8,9 @@ from mcp.server import ServerRequestContext
 from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
 
+from src.app import build_registry
 from src.config import Config
-from src.parsers.registry import ParserRegistry
-from src.storage.sqlite_store import SQLiteStore
-from src.tools import (
-    DescribeTableTool,
-    IngestFileTool,
-    ListDatasetsTool,
-    QueryTool,
-    SearchTool,
-    ToolRegistry,
-)
-from src.validators.path import PathValidator
+from src.tools import ToolRegistry
 
 _SERVER_NAME = "generic-data-mcp"
 _SERVER_VERSION = "0.1.0"
@@ -44,19 +35,7 @@ class MCPServer:
 
     @staticmethod
     def _build_registry(config: Config) -> ToolRegistry:
-        store = SQLiteStore(config.db_path)
-        path_validator = PathValidator(config.allowed_dirs)
-        parser_registry = ParserRegistry()
-
-        return ToolRegistry(
-            [
-                IngestFileTool(store, path_validator, parser_registry),
-                ListDatasetsTool(store),
-                DescribeTableTool(store),
-                QueryTool(store),
-                SearchTool(store),
-            ]
-        )
+        return build_registry(config)
 
     async def _list_tools(
         self,

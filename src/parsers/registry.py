@@ -6,6 +6,7 @@ from src.exceptions import UnsupportedFileTypeError
 from src.parsers.base import BaseParser
 from src.parsers.delimited import CSVParser, PipeDelimitedParser, TSVParser
 from src.parsers.json_parsers import JSONLParser, JSONParser
+from src.parsers.xlsx import XLSXParser
 
 
 class ParserRegistry:
@@ -13,7 +14,14 @@ class ParserRegistry:
 
     def __init__(self):
         self._parsers: dict[str, BaseParser] = {}
-        for parser in (CSVParser(), TSVParser(), PipeDelimitedParser(), JSONParser(), JSONLParser()):
+        for parser in (
+            CSVParser(),
+            TSVParser(),
+            PipeDelimitedParser(),
+            JSONParser(),
+            JSONLParser(),
+            XLSXParser(),
+        ):
             self.register(parser)
 
     def register(self, parser: BaseParser) -> None:

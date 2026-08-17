@@ -9,12 +9,22 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Local web upload GUI (ingestion console) + Excel ingestion.
+# Install with: pip install -e ".[ui]"
+ui = [
+    "flask>=3",
+    "openpyxl>=3.1",
+]
+# Everything needed to run the full test suite (which exercises the GUI and
+# Excel ingestion), so `pip install -e ".[dev]"` alone is enough in CI.
 dev = [
     "pytest>=8.0",
+    "generic-data-mcp[ui]",
 ]
 
 [project.scripts]
 generic-data-mcp = "src.server:main"
+generic-data-mcp-ui = "src.webui.server:main"
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -23,3 +33,6 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["src*"]
+
+[tool.setuptools.package-data]
+"src.webui" = ["static/*"]
