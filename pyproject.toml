@@ -12,9 +12,16 @@ dependencies = [
 dev = [
     "pytest>=8.0",
 ]
+# Local web upload GUI (ingestion console) + Excel ingestion.
+# Install with: pip install -e ".[ui]"
+ui = [
+    "flask>=3",
+    "openpyxl>=3.1",
+]
 
 [project.scripts]
 generic-data-mcp = "src.server:main"
+generic-data-mcp-ui = "src.webui.server:main"
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -23,3 +30,6 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["src*"]
+
+[tool.setuptools.package-data]
+"src.webui" = ["static/*"]

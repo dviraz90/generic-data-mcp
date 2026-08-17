@@ -24,6 +24,8 @@ class SQLiteStore:
     def __init__(self, db_path: Path):
         db_path.parent.mkdir(parents=True, exist_ok=True)
         self._connection = sqlite3.connect(str(db_path), check_same_thread=False)
+        self._connection.execute("PRAGMA journal_mode=WAL;")
+        self._connection.execute("PRAGMA busy_timeout=5000;")
 
         self.tables = TableManager(self._connection)
         self.metadata = MetadataStore(self._connection)
