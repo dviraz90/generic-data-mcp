@@ -45,7 +45,4 @@ def test_defaults_are_mutually_safe(monkeypatch):
 
     config = Config.from_env()
 
-    assert not any(
-        config.db_path == d or d in config.db_path.parents
-        for d in config.allowed_dirs
-    )
+    assert not any(config.db_path == d or d in config.db_path.parents for d in config.allowed_dirs)

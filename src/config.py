@@ -21,9 +21,7 @@ class Config:
         return cls(db_path=db_path, allowed_dirs=allowed_dirs)
 
     @staticmethod
-    def _reject_db_inside_allowed_dirs(
-        db_path: Path, allowed_dirs: tuple[Path, ...]
-    ) -> None:
+    def _reject_db_inside_allowed_dirs(db_path: Path, allowed_dirs: tuple[Path, ...]) -> None:
         """The SQLite file must not sit inside an ingest-allowed directory.
 
         Otherwise `ingest_file` could be pointed at the store itself, letting the

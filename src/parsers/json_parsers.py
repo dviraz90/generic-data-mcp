@@ -35,9 +35,7 @@ class JSONParser(BaseParser):
         if isinstance(data, dict):
             data = [data]
         if not isinstance(data, list):
-            raise ParseError(
-                f"'{path}' must contain a JSON array of objects or a single object."
-            )
+            raise ParseError(f"'{path}' must contain a JSON array of objects or a single object.")
 
         for i, record in enumerate(data):
             if not isinstance(record, dict):

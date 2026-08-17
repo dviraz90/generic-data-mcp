@@ -74,9 +74,7 @@ class SQLValidator:
             raise SQLValidationError(f"Could not parse SQL: {e}") from e
 
         if len(statements) != 1:
-            raise SQLValidationError(
-                f"Only a single statement is allowed; got {len(statements)}."
-            )
+            raise SQLValidationError(f"Only a single statement is allowed; got {len(statements)}.")
 
         tree = statements[0]
 

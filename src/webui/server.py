@@ -85,7 +85,12 @@ def create_app(
     def upload() -> tuple[Response, int]:
         file = request.files.get("file")
         if file is None or not file.filename:
-            return jsonify({"success": False, "error": "No file provided. Attach a file under the 'file' field."}), 400
+            return jsonify(
+                {
+                    "success": False,
+                    "error": "No file provided. Attach a file under the 'file' field.",
+                }
+            ), 400
 
         filename = secure_filename(file.filename)
         if not filename:
@@ -95,15 +100,18 @@ def create_app(
         stem = Path(filename).stem
         table_name = _sanitize_table_name(requested_table) or _sanitize_table_name(stem)
         if not table_name:
-            return jsonify({"success": False, "error": "Could not derive a valid table name. Provide a table_name matching [A-Za-z_][A-Za-z0-9_]*."}), 400
+            return jsonify(
+                {
+                    "success": False,
+                    "error": "Could not derive a valid table name. Provide a table_name matching [A-Za-z_][A-Za-z0-9_]*.",
+                }
+            ), 400
 
         upload_dir.mkdir(parents=True, exist_ok=True)
         saved_path = upload_dir / filename
         file.save(str(saved_path))
 
-        result = registry.call(
-            "ingest_file", {"path": str(saved_path), "table_name": table_name}
-        )
+        result = registry.call("ingest_file", {"path": str(saved_path), "table_name": table_name})
         return _respond(result)
 
     return app
@@ -116,7 +124,10 @@ def main() -> None:
 
     port = int(os.environ.get("MCP_UI_PORT", _DEFAULT_PORT))
     url = f"http://127.0.0.1:{port}/"
-    print(f"\n  generic-data-mcp upload console is running at:\n\n      {url}\n\n  Open it in your browser (Ctrl+C to stop).\n", flush=True)
+    print(
+        f"\n  generic-data-mcp upload console is running at:\n\n      {url}\n\n  Open it in your browser (Ctrl+C to stop).\n",
+        flush=True,
+    )
     try:
         webbrowser.open(url)
     except (OSError, webbrowser.Error):

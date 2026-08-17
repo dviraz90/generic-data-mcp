@@ -56,7 +56,7 @@ class MetadataStore:
 
     def list_all(self) -> list[DatasetInfo]:
         cursor = self._conn.execute(
-            f'SELECT table_name, source_path, row_count, ingested_at '
+            f"SELECT table_name, source_path, row_count, ingested_at "
             f'FROM "{_METADATA_TABLE}" ORDER BY table_name'
         )
         return [DatasetInfo(*row) for row in cursor.fetchall()]

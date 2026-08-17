@@ -50,7 +50,9 @@ class SearchTool(BaseTool):
             if action == "search":
                 query = arguments.get("query", "")
                 if not query:
-                    return ToolResult.fail("The 'search' action requires a non-empty 'query' string.")
+                    return ToolResult.fail(
+                        "The 'search' action requires a non-empty 'query' string."
+                    )
                 limit = arguments.get("limit", 50)
                 results = self._store.search(table_name, query, limit)
                 return ToolResult.ok(table_name=table_name, query=query, results=results)
