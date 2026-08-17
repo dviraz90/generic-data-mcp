@@ -115,6 +115,7 @@ def main() -> None:
 
     port = int(os.environ.get("MCP_UI_PORT", _DEFAULT_PORT))
     url = f"http://127.0.0.1:{port}/"
+    print(f"\n  generic-data-mcp upload console is running at:\n\n      {url}\n\n  Open it in your browser (Ctrl+C to stop).\n", flush=True)
     try:
         webbrowser.open(url)
     except Exception:

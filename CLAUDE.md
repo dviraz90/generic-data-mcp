@@ -15,7 +15,8 @@ pip install -e ".[ui]"
 # Run the MCP server (stdio transport, for LLM clients)
 MCP_DB_PATH=./db/store.db MCP_ALLOWED_DIRS=./data generic-data-mcp
 
-# Run the local upload GUI (HTTP transport, for humans) — opens the browser
+# Run the local upload GUI (HTTP transport, for humans) — prints the localhost
+# link (http://127.0.0.1:8765/, or $MCP_UI_PORT) on startup and opens the browser
 MCP_DB_PATH=./db/store.db MCP_ALLOWED_DIRS=./data generic-data-mcp-ui
 
 # Run all tests
