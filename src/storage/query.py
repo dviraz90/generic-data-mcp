@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
+from typing import Any
 
 from src.validators.sql import SQLValidator
 
@@ -11,7 +12,7 @@ _ROW_LIMIT = 1000
 @dataclass(frozen=True)
 class QueryResult:
     columns: list[str]
-    rows: list[tuple]
+    rows: list[tuple[Any, ...]]
     truncated: bool
 
 

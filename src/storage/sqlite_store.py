@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
+from typing import Any
 
 from src.storage.ingest import DataIngestor
 from src.storage.metadata import DatasetInfo, MetadataStore
@@ -41,11 +42,11 @@ class SQLiteStore:
     def list_datasets(self) -> list[DatasetInfo]:
         return self.metadata.list_all()
 
-    def describe_table(self, table_name: str) -> tuple[TableSchema, list[dict]]:
+    def describe_table(self, table_name: str) -> tuple[TableSchema, list[dict[str, Any]]]:
         schema = self.tables.get_schema(table_name)
         cursor = self._connection.execute(f'SELECT * FROM "{table_name}" LIMIT 5')
         columns = [d[0] for d in cursor.description]
-        sample_rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        sample_rows = [dict(zip(columns, row, strict=True)) for row in cursor.fetchall()]
         return schema, sample_rows
 
     def query(self, sql: str) -> QueryResult:
@@ -54,7 +55,7 @@ class SQLiteStore:
     def enable_search(self, table_name: str, columns: list[str]) -> str:
         return self.search_index.enable(table_name, columns)
 
-    def search(self, table_name: str, query: str, limit: int = 50) -> list[dict]:
+    def search(self, table_name: str, query: str, limit: int = 50) -> list[dict[str, Any]]:
         return self.search_index.search(table_name, query, limit)
 
     def close(self) -> None:

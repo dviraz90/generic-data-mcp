@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 _METADATA_TABLE = "_mcp_datasets"
 
@@ -40,9 +40,9 @@ class MetadataStore:
         self._conn.commit()
 
     def record(self, table_name: str, source_path: str, row_count: int) -> None:
-        ingested_at = datetime.now(timezone.utc).isoformat()
+        ingested_at = datetime.now(UTC).isoformat()
         self._conn.execute(
-            f'''
+            rf'''
             INSERT INTO "{_METADATA_TABLE}" (table_name, source_path, row_count, ingested_at)
             VALUES (?, ?, ?, ?)
             ON CONFLICT(table_name) DO UPDATE SET

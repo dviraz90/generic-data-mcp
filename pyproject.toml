@@ -19,6 +19,9 @@ ui = [
 # Excel ingestion), so `pip install -e ".[dev]"` alone is enough in CI.
 dev = [
     "pytest>=8.0",
+    "ruff==0.14.0",
+    "mypy==1.18.2",
+    "pip-audit>=2.7",
     "generic-data-mcp[ui]",
 ]
 
@@ -36,3 +39,51 @@ include = ["src*"]
 
 [tool.setuptools.package-data]
 "src.webui" = ["static/*"]
+
+# ---------------------------------------------------------------------------
+# Lint / type-check / tooling config
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# Explicit rule selection: ruff's *default* set changes between releases, so
+# pinning the selection (and the ruff version in [dev]) keeps CI deterministic.
+select = [
+    "E", "W",    # pycodestyle
+    "F",         # pyflakes
+    "I",         # import sorting
+    "UP",        # pyupgrade
+    "B",         # bugbear
+    "S",         # bandit (security)
+    "A",         # builtin shadowing
+    "C4",        # comprehensions
+    "PL",        # pylint
+    "BLE",       # blind except
+    "RUF",       # ruff-specific
+]
+ignore = [
+    "E501",      # line length is handled by the formatter
+    "PLR0913",   # tool constructors legitimately take several collaborators
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The storage layer interpolates table/column identifiers into SQL because
+# SQLite cannot parameterize identifiers. Every such site is gated by
+# validate_identifier() (^[A-Za-z_][A-Za-z0-9_]*$) first; see
+# tests/test_sql_validator.py for the enforcement tests.
+"src/storage/*.py" = ["S608"]
+# Tests assert on internals and use asserts by design.
+"tests/*" = ["S101", "PLR2004", "S608"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src"]
+strict = true
+# Third-party packages without bundled stubs.
+[[tool.mypy.overrides]]
+module = ["openpyxl.*", "flask.*", "werkzeug.*", "mcp.*", "sqlglot.*"]
+ignore_missing_imports = true

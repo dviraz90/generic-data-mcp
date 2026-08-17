@@ -1,5 +1,4 @@
 import openpyxl
-
 from src.parsers.xlsx import XLSXParser
 
 
@@ -66,7 +65,7 @@ def test_trailing_empty_rows_are_skipped(tmp_path):
 
 
 def test_empty_sheet_raises_parse_error(tmp_path):
-    from src.exceptions import ParseError
+    from src.exceptions import ParseError  # noqa: PLC0415 - lazy: optional [ui] dependency
 
     xlsx_path = tmp_path / "empty.xlsx"
     _write_workbook(xlsx_path, [])

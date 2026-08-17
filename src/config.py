@@ -13,7 +13,7 @@ class Config:
     allowed_dirs: tuple[Path, ...]
 
     @classmethod
-    def from_env(cls) -> "Config":
+    def from_env(cls) -> Config:
         db_path = Path(os.environ.get("MCP_DB_PATH", "./db/store.db")).resolve()
         raw_dirs = os.environ.get("MCP_ALLOWED_DIRS", "./data")
         allowed_dirs = tuple(Path(d).resolve() for d in raw_dirs.split(":") if d)

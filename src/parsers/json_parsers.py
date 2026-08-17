@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from src.exceptions import ParseError
 from src.parsers.base import BaseParser
@@ -52,8 +53,8 @@ class JSONLParser(BaseParser):
 
     def parse(self, path: Path) -> Iterator[dict[str, str]]:
         with path.open("r", encoding="utf-8") as f:
-            for line_no, line in enumerate(f, start=1):
-                line = line.strip()
+            for line_no, raw_line in enumerate(f, start=1):
+                line = raw_line.strip()
                 if not line:
                     continue
                 try:

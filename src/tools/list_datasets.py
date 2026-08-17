@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from src.storage.sqlite_store import SQLiteStore
 from src.tools.base import BaseTool, ToolResult
@@ -12,7 +12,7 @@ class ListDatasetsTool(BaseTool):
         "List every dataset currently loaded into SQLite, with row counts and source "
         "file paths. Call this first if you don't know what data is available."
     )
-    input_schema = {"type": "object", "properties": {}}
+    input_schema: ClassVar[dict[str, Any]] = {"type": "object", "properties": {}}
 
     def __init__(self, store: SQLiteStore):
         self._store = store

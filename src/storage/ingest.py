@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import itertools
 import sqlite3
-from typing import Iterator
+from collections.abc import Iterator
 
 from src.exceptions import GenericDataMCPError
 from src.storage.metadata import MetadataStore
@@ -74,7 +74,7 @@ class DataIngestor:
         inferred = self._inferrer.infer(sample_rows, source_order)
         columns = tuple(
             ColumnSchema(name=name, sql_type=col.sql_type)
-            for name, col in zip(column_names, inferred.columns)
+            for name, col in zip(column_names, inferred.columns, strict=True)
         )
         schema = TableSchema(name=table_name, columns=columns)
 

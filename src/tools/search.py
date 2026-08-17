@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from src.exceptions import GenericDataMCPError
 from src.storage.sqlite_store import SQLiteStore
@@ -14,7 +14,7 @@ class SearchTool(BaseTool):
         "(table_name, columns) pair with FTS5 — call this once before searching a "
         "table; 'search' runs a keyword query against an already-enabled table."
     )
-    input_schema = {
+    input_schema: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "action": {"type": "string", "enum": ["enable", "search"]},

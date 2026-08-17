@@ -1,5 +1,4 @@
 import pytest
-
 from src.parsers.registry import ParserRegistry
 from src.storage.sqlite_store import SQLiteStore
 from src.tools import (

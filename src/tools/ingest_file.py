@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from src.exceptions import GenericDataMCPError
 from src.parsers.registry import ParserRegistry
@@ -17,7 +17,7 @@ class IngestFileTool(BaseTool):
         "dataset that hasn't been loaded yet. Choose a short, descriptive table_name "
         "(e.g. 'orders', 'users') matching [A-Za-z_][A-Za-z0-9_]*."
     )
-    input_schema = {
+    input_schema: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "path": {

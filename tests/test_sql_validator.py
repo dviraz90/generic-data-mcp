@@ -1,5 +1,4 @@
 import pytest
-
 from src.exceptions import SQLValidationError
 from src.validators.sql import SQLValidator, validate_identifier
 

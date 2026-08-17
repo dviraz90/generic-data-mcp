@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from typing import Any
 
 from src.exceptions import GenericDataMCPError
 from src.storage.tables import TableManager
@@ -66,14 +67,14 @@ class SearchIndex:
             f'SELECT rowid, {column_list} FROM "{table_name}"'
         )
         self._conn.execute(
-            f'''
+            rf'''
             CREATE TRIGGER "{table_name}_ai" AFTER INSERT ON "{table_name}" BEGIN
                 INSERT INTO "{fts_table}"(rowid, {column_list}) VALUES (new.rowid, {new_values});
             END
             '''
         )
         self._conn.execute(
-            f'''
+            rf'''
             CREATE TRIGGER "{table_name}_ad" AFTER DELETE ON "{table_name}" BEGIN
                 INSERT INTO "{fts_table}"("{fts_table}", rowid, {column_list})
                 VALUES ('delete', old.rowid, {old_values});
@@ -81,7 +82,7 @@ class SearchIndex:
             '''
         )
         self._conn.execute(
-            f'''
+            rf'''
             CREATE TRIGGER "{table_name}_au" AFTER UPDATE ON "{table_name}" BEGIN
                 INSERT INTO "{fts_table}"("{fts_table}", rowid, {column_list})
                 VALUES ('delete', old.rowid, {old_values});
@@ -92,7 +93,7 @@ class SearchIndex:
         self._conn.commit()
         return fts_table
 
-    def search(self, table_name: str, query: str, limit: int = 50) -> list[dict]:
+    def search(self, table_name: str, query: str, limit: int = 50) -> list[dict[str, Any]]:
         validate_identifier(table_name)
         if not self.is_enabled(table_name):
             raise GenericDataMCPError(
@@ -102,7 +103,7 @@ class SearchIndex:
 
         fts_table = self._fts_table(table_name)
         cursor = self._conn.execute(
-            f'''
+            rf'''
             SELECT "{table_name}".*
             FROM "{fts_table}"
             JOIN "{table_name}" ON "{table_name}".rowid = "{fts_table}".rowid
@@ -113,4 +114,4 @@ class SearchIndex:
             (query, limit),
         )
         columns = [d[0] for d in cursor.description]
-        return [dict(zip(columns, row)) for row in cursor.fetchall()]
+        return [dict(zip(columns, row, strict=True)) for row in cursor.fetchall()]

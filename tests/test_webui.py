@@ -1,7 +1,6 @@
 import io
 
 import pytest
-
 from src.config import Config
 from src.parsers.registry import ParserRegistry
 from src.storage.sqlite_store import SQLiteStore

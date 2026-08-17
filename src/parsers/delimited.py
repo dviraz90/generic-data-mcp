@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import csv
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 from src.exceptions import ParseError
 from src.parsers.base import BaseParser
@@ -31,15 +31,15 @@ class DelimitedParser(BaseParser):
 
 
 class CSVParser(DelimitedParser):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(name="csv", extensions=(".csv",), delimiter=",")
 
 
 class TSVParser(DelimitedParser):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(name="tsv", extensions=(".tsv",), delimiter="\t")
 
 
 class PipeDelimitedParser(DelimitedParser):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(name="pipe", extensions=(".psv", ".pipe"), delimiter="|")

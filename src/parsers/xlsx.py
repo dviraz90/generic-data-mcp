@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from src.exceptions import ParseError, UnsupportedFileTypeError
 from src.parsers.base import BaseParser
@@ -26,7 +27,7 @@ class XLSXParser(BaseParser):
 
     def parse(self, path: Path) -> Iterator[dict[str, str]]:
         try:
-            import openpyxl
+            import openpyxl  # noqa: PLC0415 - lazy: openpyxl is an optional [ui] extra
         except ImportError as e:
             raise UnsupportedFileTypeError(
                 "Reading '.xlsx' files requires the optional 'openpyxl' dependency. "
@@ -40,8 +41,8 @@ class XLSXParser(BaseParser):
 
             try:
                 header_row = next(rows)
-            except StopIteration:
-                raise ParseError(f"'{path}' has no header row: the sheet is empty.")
+            except StopIteration as e:
+                raise ParseError(f"'{path}' has no header row: the sheet is empty.") from e
 
             headers = [_stringify(cell) for cell in header_row]
             if not any(h != "" for h in headers):
@@ -53,7 +54,7 @@ class XLSXParser(BaseParser):
                 if not any(v != "" for v in values):
                     continue
                 record: dict[str, str] = {}
-                for header, value in zip(headers, values):
+                for header, value in zip(headers, values, strict=False):
                     if header == "":
                         continue
                     record[header] = value

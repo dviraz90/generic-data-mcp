@@ -1,16 +1,17 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 import webbrowser
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, Response, jsonify, request, send_from_directory
 from werkzeug.utils import secure_filename
 
 from src.app import build_registry
 from src.config import Config
-from src.tools import ToolRegistry
+from src.tools import ToolRegistry, ToolResult
 
 _STATIC_DIR = Path(__file__).parent / "static"
 _MAX_UPLOAD_BYTES = 200 * 1024 * 1024  # 200 MB
@@ -58,30 +59,30 @@ def create_app(
     app.config["MAX_CONTENT_LENGTH"] = _MAX_UPLOAD_BYTES
     app.config["UPLOAD_DIR"] = upload_dir
 
-    def _respond(result):
+    def _respond(result: ToolResult) -> tuple[Response, int]:
         status = 200 if result.success else 400
         return jsonify(result.to_dict()), status
 
     @app.get("/")
-    def index():
+    def index() -> Response:
         return send_from_directory(_STATIC_DIR, "index.html")
 
     @app.get("/api/datasets")
-    def list_datasets():
+    def list_datasets() -> tuple[Response, int]:
         return _respond(registry.call("list_datasets", {}))
 
     @app.get("/api/datasets/<name>")
-    def describe_table(name: str):
+    def describe_table(name: str) -> tuple[Response, int]:
         return _respond(registry.call("describe_table", {"table_name": name}))
 
     @app.post("/api/query")
-    def query():
+    def query() -> tuple[Response, int]:
         body = request.get_json(silent=True) or {}
         sql = body.get("sql", "")
         return _respond(registry.call("query", {"sql": sql}))
 
     @app.post("/api/upload")
-    def upload():
+    def upload() -> tuple[Response, int]:
         file = request.files.get("file")
         if file is None or not file.filename:
             return jsonify({"success": False, "error": "No file provided. Attach a file under the 'file' field."}), 400
@@ -118,8 +119,8 @@ def main() -> None:
     print(f"\n  generic-data-mcp upload console is running at:\n\n      {url}\n\n  Open it in your browser (Ctrl+C to stop).\n", flush=True)
     try:
         webbrowser.open(url)
-    except Exception:
-        pass
+    except (OSError, webbrowser.Error):
+        logging.getLogger(__name__).debug("Could not auto-open a browser; open %s manually.", url)
     app.run(host="127.0.0.1", port=port)
 
 

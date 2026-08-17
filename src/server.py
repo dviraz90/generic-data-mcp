@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 
-import mcp.types as types
+from mcp import types
 from mcp.server import ServerRequestContext
 from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server

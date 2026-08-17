@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class SQLType(str, Enum):
+class SQLType(StrEnum):
     INTEGER = "INTEGER"
     REAL = "REAL"
     TEXT = "TEXT"
