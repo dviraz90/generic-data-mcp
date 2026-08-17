@@ -9,14 +9,17 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = [
-    "pytest>=8.0",
-]
 # Local web upload GUI (ingestion console) + Excel ingestion.
 # Install with: pip install -e ".[ui]"
 ui = [
     "flask>=3",
     "openpyxl>=3.1",
+]
+# Everything needed to run the full test suite (which exercises the GUI and
+# Excel ingestion), so `pip install -e ".[dev]"` alone is enough in CI.
+dev = [
+    "pytest>=8.0",
+    "generic-data-mcp[ui]",
 ]
 
 [project.scripts]
