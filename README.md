@@ -1,6 +1,10 @@
 # generic-data-mcp
 
-An MCP server that ingests structured data files (CSV, TSV, pipe-delimited, JSON, JSONL) into SQLite and exposes them as queryable tools for an LLM. The user asks questions in natural language; the LLM composes the tools to answer.
+An MCP server for querying data files, built on the assumption that the model is untrusted.
+Point it at a directory; the agent gets SQL and keyword search over it — with no code execution,
+no writes, and no path escape.
+
+It ingests structured data files (CSV, TSV, pipe-delimited, JSON, JSONL) into SQLite and exposes them as queryable tools for an LLM. The user asks questions in natural language; the LLM composes the tools to answer.
 
 ## Tools
 
@@ -14,15 +18,11 @@ An MCP server that ingests structured data files (CSV, TSV, pipe-delimited, JSON
 
 ## Design notes
 
-**OOP throughout.** Every concept is a class. Parsers are a strategy hierarchy under `BaseParser` with a `ParserRegistry` for resolution. The storage layer splits into four focused managers (`TableManager`, `DataIngestor`, `QueryExecutor`, `SearchIndex`) under a single `SQLiteStore`. Tools are command objects under `BaseTool`, held by `ToolRegistry`. Validators are pure: they raise on bad input and have no side effects.
-
-**Dependency injection.** Every collaborator is passed through the constructor. No globals, no singletons, no module-level state outside class definitions. Means every class is unit-testable in isolation — see the e2e test that builds a real `SQLiteStore` against `tmp_path` and exercises the tools directly.
-
-**Tool descriptions are written for the LLM.** Each `description` says *when* to use the tool and how to compose inputs (e.g. *"call describe_table first if you don't know the schema"*). Errors are written so the LLM can recover — *"Only SELECT is allowed; got DROP. To explore the schema, use describe_table"* is more useful than *"Invalid SQL"*.
-
 **SQL safety.** I pass user/LLM SQL through `sqlglot` (a real parser, not regex), reject any non-SELECT, reject multi-statement queries, and walk the AST for forbidden node types as defense-in-depth. Identifiers passed through other tools (`table_name`, columns) are validated against `[A-Za-z_][A-Za-z0-9_]*` even though I always quote them.
 
 **Path safety.** `ingest_file` only accepts paths under `MCP_ALLOWED_DIRS`, and the SQLite store is required to live outside that tree. Paths are resolved (`Path.resolve()`) before the check, so symlinks and `..` traversal can't escape. Belt-and-braces against the LLM passing `/etc/passwd` or similar.
+
+**Tool descriptions are written for the LLM.** Each `description` says *when* to use the tool and how to compose inputs (e.g. *"call describe_table first if you don't know the schema"*). Errors are written so the LLM can recover — *"Only SELECT is allowed; got DROP. To explore the schema, use describe_table"* is more useful than *"Invalid SQL"*.
 
 **Type inference is conservative.** Sample 200 rows; a column is INTEGER only if every non-empty value parses as int, REAL if every value parses as a number, otherwise TEXT. Booleans are intentionally NOT coerced to integers — too easy to lose semantics.
 
@@ -30,13 +30,9 @@ An MCP server that ingests structured data files (CSV, TSV, pipe-delimited, JSON
 
 **FTS5 is opt-in.** Auto-indexing every table doubles storage. Instead, the `search` tool's `enable` action lets the LLM (or user) index a specific (table, columns) pair. Triggers keep the index in sync with the source table.
 
-## Future features
+**OOP throughout.** Every concept is a class. Parsers are a strategy hierarchy under `BaseParser` with a `ParserRegistry` for resolution. The storage layer splits into four focused managers (`TableManager`, `DataIngestor`, `QueryExecutor`, `SearchIndex`) under a single `SQLiteStore`. Tools are command objects under `BaseTool`, held by `ToolRegistry`. Validators are pure: they raise on bad input and have no side effects.
 
-- **More parsers**: Excel (openpyxl), Parquet, YAML, TOML, fixed-width text
-- **Vector search**: add `sqlite-vec` so the LLM can search by meaning, not just keywords
-- **Watch mode**: re-ingest files when they change on disk
-- **Sampling/aggregation helpers**: `sample(table, n)`, `group_by(table, col, agg)` so the LLM doesn't always have to write SQL
-- **Multi-tenant workspaces**: isolated SQLite databases per tenant
+**Dependency injection.** Every collaborator is passed through the constructor. No globals, no singletons, no module-level state outside class definitions. Means every class is unit-testable in isolation — see the e2e test that builds a real `SQLiteStore` against `tmp_path` and exercises the tools directly.
 
 ## Running
 
@@ -48,30 +44,6 @@ MCP_DB_PATH=./db/store.db MCP_ALLOWED_DIRS=./data generic-data-mcp
 The database must live **outside** every directory in `MCP_ALLOWED_DIRS`. `Config.from_env()`
 refuses to start otherwise — if the store sits inside the ingest tree, `ingest_file` can be
 pointed at the store itself and read every other dataset back out.
-
-### Local upload GUI
-
-A local **ingestion console** — drag-and-drop upload (including XLSX), browse loaded datasets,
-preview schemas, and run SELECT queries — for humans, over plain HTTP on `127.0.0.1`. It shares
-the same SQLite DB and `data/` tree as the MCP server; the MCP protocol is unchanged.
-
-```bash
-pip install -e ".[ui]"
-MCP_DB_PATH=./db/store.db MCP_ALLOWED_DIRS=./data generic-data-mcp-ui
-```
-
-On startup the console prints the link it's serving on and opens your browser to it:
-
-```
-  generic-data-mcp upload console is running at:
-
-      http://127.0.0.1:8765/
-
-  Open it in your browser (Ctrl+C to stop).
-```
-
-Override the port with `MCP_UI_PORT` (the printed link updates to match). Uploaded files are
-saved under `<first allowed dir>/uploads/` (e.g. `./data/uploads/`).
 
 ### Docker
 
@@ -243,5 +215,30 @@ tests/
   test_type_inferrer.py
   test_e2e.py
 ```
+
+## Companion upload console (for humans)
+
+A local **ingestion console** — drag-and-drop upload (including XLSX), browse loaded datasets,
+preview schemas, and run SELECT queries — for humans, over plain HTTP on `127.0.0.1`. It shares
+the same SQLite DB and `data/` tree as the MCP server, but is not part of the agent-facing tool
+surface; the MCP protocol above is unchanged by its presence.
+
+```bash
+pip install -e ".[ui]"
+MCP_DB_PATH=./db/store.db MCP_ALLOWED_DIRS=./data generic-data-mcp-ui
+```
+
+On startup the console prints the link it's serving on and opens your browser to it:
+
+```
+  generic-data-mcp upload console is running at:
+
+      http://127.0.0.1:8765/
+
+  Open it in your browser (Ctrl+C to stop).
+```
+
+Override the port with `MCP_UI_PORT` (the printed link updates to match). Uploaded files are
+saved under `<first allowed dir>/uploads/` (e.g. `./data/uploads/`).
 
 Run tests: `python -m pytest tests/ -v`
