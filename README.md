@@ -60,9 +60,60 @@ The image runs as a non-root user with a nologin shell, and compose adds `networ
 `read_only`, `cap_drop: ALL`, `no-new-privileges`, and memory/PID limits. `/data` holds user
 files; the SQLite store is on a separate `/db` volume.
 
+### Running on macOS
+
+**Native (no Docker):**
+
+```bash
+brew install python@3.11   # or use the system/pyenv python3, 3.10+
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e .
+MCP_DB_PATH=./db/store.db MCP_ALLOWED_DIRS=./data generic-data-mcp
+```
+
+**Docker Desktop:**
+
+1. Install [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/) and start it.
+2. Build and run from the project root:
+
+   ```bash
+   docker build -t generic-data-mcp:latest .
+   docker compose run --rm generic-data-mcp
+   ```
+3. If you mount directories outside your home folder (e.g. `/Volumes/...` or another disk),
+   add them under **Settings → Resources → File Sharing** in Docker Desktop first, or the
+   volume mount will fail silently with an empty directory inside the container.
+4. For the Claude Desktop / Cursor / VS Code JSON configs below, use absolute macOS paths
+   (e.g. `/Users/you/generic-data-mcp/data`), not `~` — MCP clients don't expand the shell tilde.
+
 ## Client configuration
 
 Any MCP-compatible client works. The server communicates over **stdio** — the client spawns it as a subprocess and passes `MCP_DB_PATH` and `MCP_ALLOWED_DIRS` as environment variables.
+
+### Automatic setup (Claude Desktop, macOS & Windows)
+
+`scripts/install_claude_desktop_config.py` locates `claude_desktop_config.json` for your OS,
+merges in a `generic-data-mcp` entry, and writes it back — any other servers already configured
+are left untouched. It refuses to run if `--db-path` is inside `--allowed-dirs` (the same check
+`Config.from_env()` enforces at server startup), backs up the existing file to `.bak` before
+touching it, and writes atomically with owner-only (`0600`) permissions since the file can hold
+other servers' secrets.
+
+```bash
+# Local install
+python3 scripts/install_claude_desktop_config.py --db-path ./db/store.db --allowed-dirs ./data
+
+# Docker
+python3 scripts/install_claude_desktop_config.py --db-path ./db/store.db --allowed-dirs ./data --docker
+
+# Preview the merged config without writing anything
+python3 scripts/install_claude_desktop_config.py --db-path ./db/store.db --allowed-dirs ./data --dry-run
+```
+
+Use absolute paths (or paths relative to the directory you run the script from) — they're
+resolved and written into the config as absolute paths either way. Restart Claude Desktop
+afterward for the change to take effect. For Cursor or VS Code, or to configure by hand, see the
+JSON examples below.
 
 **Claude Desktop** — `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
