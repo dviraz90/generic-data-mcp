@@ -1,0 +1,26 @@
+[
+  {"id": "path-allow-01", "class": "path_valid", "expect": "allow", "input": "{allowed}/data.csv", "note": "file directly in the allowed dir"},
+  {"id": "path-allow-02", "class": "path_valid", "expect": "allow", "input": "{allowed}/nested/deep.csv", "note": "file in a subdirectory"},
+  {"id": "path-allow-03", "class": "path_valid", "expect": "allow", "input": "{allowed}/./data.csv", "note": "redundant ./ still resolves inside"},
+  {"id": "path-allow-04", "class": "path_valid", "expect": "allow", "input": "{allowed}/nested/../data.csv", "note": ".. that stays inside the sandbox"},
+  {"id": "path-allow-05", "class": "path_valid", "expect": "allow", "input": "{allowed2}/second.csv", "note": "second configured allowed dir"},
+
+  {"id": "path-traverse-01", "class": "traversal", "expect": "reject", "input": "{allowed}/../outside/secret.txt", "note": "single .. escape"},
+  {"id": "path-traverse-02", "class": "traversal", "expect": "reject", "input": "{allowed}/../../etc/passwd", "note": "double .. escape"},
+  {"id": "path-traverse-03", "class": "traversal", "expect": "reject", "input": "{allowed}/nested/../../outside/secret.txt", "note": ".. from a subdirectory"},
+  {"id": "path-traverse-04", "class": "traversal", "expect": "reject", "input": "{allowed}/./../../outside/secret.txt", "note": "mixed ./ and ../"},
+  {"id": "path-traverse-05", "class": "traversal", "expect": "reject", "input": "{outside}/secret.txt", "note": "plain path outside the sandbox"},
+
+  {"id": "path-symlink-01", "class": "symlink", "expect": "reject", "input": "{allowed}/link_to_secret.txt", "note": "symlink in the sandbox pointing out of it"},
+  {"id": "path-symlink-02", "class": "symlink", "expect": "reject", "input": "{allowed}/link_to_outside_dir/secret.txt", "note": "traversal through a symlinked directory"},
+
+  {"id": "path-absolute-01", "class": "absolute", "expect": "reject", "input": "/etc/passwd", "note": "absolute system path"},
+  {"id": "path-absolute-02", "class": "absolute", "expect": "reject", "input": "/etc/shadow", "note": "absolute system path"},
+
+  {"id": "path-store-01", "class": "store_readback", "expect": "reject", "input": "{db_path}", "note": "the SQLite store itself — reading it back would expose every dataset"},
+
+  {"id": "path-shape-01", "class": "path_shape", "expect": "reject", "input": "{allowed}/missing.csv", "note": "does not exist"},
+  {"id": "path-shape-02", "class": "path_shape", "expect": "reject", "input": "{allowed}", "note": "a directory, not a file"},
+  {"id": "path-shape-03", "class": "path_shape", "expect": "reject", "input": "{allowed}/nested", "note": "a subdirectory, not a file"},
+  {"id": "path-shape-04", "class": "path_shape", "expect": "reject", "input": "", "note": "empty path resolves to cwd"}
+]

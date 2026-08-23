@@ -4,7 +4,7 @@ import re
 
 import sqlglot
 from sqlglot import exp
-from sqlglot.errors import ParseError as SqlglotParseError
+from sqlglot.errors import SqlglotError
 
 from src.exceptions import SQLValidationError
 
@@ -70,7 +70,11 @@ class SQLValidator:
 
         try:
             statements = [s for s in sqlglot.parse(stripped, read="sqlite") if s is not None]
-        except SqlglotParseError as e:
+        except SqlglotError as e:
+            # SqlglotError, not ParseError: an unterminated quote (e.g. the classic
+            # "'; DROP TABLE x; --" fragment) raises TokenError, a sibling of
+            # ParseError. Catching only ParseError let that escape as a raw sqlglot
+            # exception instead of the recovery-oriented message tools promise.
             raise SQLValidationError(f"Could not parse SQL: {e}") from e
 
         if len(statements) != 1:
