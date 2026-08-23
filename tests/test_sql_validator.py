@@ -56,6 +56,17 @@ def test_rejects_unparseable_sql(validator):
         validator.validate("SELEKT * FORM orders")
 
 
+def test_rejects_unterminated_quote_as_our_own_error(validator):
+    """An unterminated quote raises sqlglot's TokenError, not ParseError.
+
+    Both derive from SqlglotError; catching only ParseError let the raw
+    third-party exception escape, so the LLM saw "TokenError: Error tokenizing"
+    instead of a message telling it what to do next.
+    """
+    with pytest.raises(SQLValidationError):
+        validator.validate("'; DROP TABLE orders; --")
+
+
 def test_validate_identifier_accepts_valid_name():
     assert validate_identifier("orders_2024") == "orders_2024"
 

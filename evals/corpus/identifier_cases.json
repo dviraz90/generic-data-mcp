@@ -1,0 +1,27 @@
+[
+  {"id": "ident-allow-01", "class": "identifier_valid", "expect": "allow", "input": "orders", "note": "plain name"},
+  {"id": "ident-allow-02", "class": "identifier_valid", "expect": "allow", "input": "orders_2024", "note": "digits after letters"},
+  {"id": "ident-allow-03", "class": "identifier_valid", "expect": "allow", "input": "_private", "note": "leading underscore"},
+  {"id": "ident-allow-04", "class": "identifier_valid", "expect": "allow", "input": "A", "note": "single char"},
+  {"id": "ident-allow-05", "class": "identifier_valid", "expect": "allow", "input": "CamelCase_99", "note": "mixed case + digits"},
+
+  {"id": "ident-inject-01", "class": "identifier_injection", "expect": "reject", "input": "orders; DROP TABLE x", "note": "statement terminator"},
+  {"id": "ident-inject-02", "class": "identifier_injection", "expect": "reject", "input": "orders\" ; DROP TABLE x --", "note": "quote break-out"},
+  {"id": "ident-inject-03", "class": "identifier_injection", "expect": "reject", "input": "orders'", "note": "single quote"},
+  {"id": "ident-inject-04", "class": "identifier_injection", "expect": "reject", "input": "orders`", "note": "backtick"},
+  {"id": "ident-inject-05", "class": "identifier_injection", "expect": "reject", "input": "orders]", "note": "bracket quoting"},
+  {"id": "ident-inject-06", "class": "identifier_injection", "expect": "reject", "input": "orders--comment", "note": "inline comment"},
+  {"id": "ident-inject-07", "class": "identifier_injection", "expect": "reject", "input": "orders/*x*/", "note": "block comment"},
+  {"id": "ident-inject-08", "class": "identifier_injection", "expect": "reject", "input": "main.orders", "note": "schema qualification escapes the quoted-name assumption"},
+  {"id": "ident-inject-09", "class": "identifier_injection", "expect": "reject", "input": "orders(1)", "note": "call syntax"},
+  {"id": "ident-inject-10", "class": "identifier_injection", "expect": "reject", "input": "orders x", "note": "embedded space / aliasing"},
+
+  {"id": "ident-shape-01", "class": "identifier_shape", "expect": "reject", "input": "", "note": "empty"},
+  {"id": "ident-shape-02", "class": "identifier_shape", "expect": "reject", "input": "   ", "note": "whitespace only"},
+  {"id": "ident-shape-03", "class": "identifier_shape", "expect": "reject", "input": "2024_orders", "note": "leading digit"},
+  {"id": "ident-shape-04", "class": "identifier_shape", "expect": "reject", "input": "orders-2024", "note": "hyphen"},
+  {"id": "ident-shape-05", "class": "identifier_shape", "expect": "reject", "input": "ordérs", "note": "non-ascii letter"},
+  {"id": "ident-shape-06", "class": "identifier_shape", "expect": "reject", "input": "orders\nx", "note": "embedded newline"},
+  {"id": "ident-shape-07", "class": "identifier_shape", "expect": "reject", "input": "orders\u0000x", "note": "embedded null byte"},
+  {"id": "ident-shape-08", "class": "identifier_shape", "expect": "reject", "input": "*", "note": "wildcard"}
+]
