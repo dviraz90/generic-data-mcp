@@ -8,7 +8,9 @@ from sqlglot.errors import SqlglotError
 
 from src.exceptions import SQLValidationError
 
-_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+# \Z, not $: Python's $ also matches just before a trailing newline, so
+# "orders\n" satisfied the pattern and was returned unchanged as a table name.
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\Z")
 
 _ALLOWED_ROOT_TYPES = (exp.Select, exp.With, exp.Union, exp.Subquery)
 
