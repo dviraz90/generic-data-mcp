@@ -1,8 +1,12 @@
-"""Run the boundary corpus and write a report to `evals/results/`.
+"""Run the boundary corpus and print the results.
 
-    python -m evals.run              # run, print summary, write results JSON
-    python -m evals.run --no-write   # run and print only
-    python -m evals.run --verbose    # also list every case outcome
+    python -m evals.run                    # run and print the summary
+    python -m evals.run --verbose          # also list every case outcome
+    python -m evals.run --out report.json  # additionally write a JSON report
+
+Nothing is written unless --out names a path: the run is deterministic and takes
+under a second, so a committed copy of its output would only go stale. Exit
+status is non-zero if any case behaved unexpectedly.
 
 No API key, no network, no configuration. See evals/README.md.
 """
@@ -17,8 +21,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from evals.harness import Outcome, run_all, summarize
-
-RESULTS_DIR = Path(__file__).parent / "results"
 
 # sqlglot logs a warning when a statement (REPLACE, CREATE TRIGGER, ALTER RENAME)
 # falls back to being parsed as a generic Command. That fallback is expected here —
@@ -72,22 +74,21 @@ def _print_summary(summary: dict, outcomes: list[Outcome], verbose: bool) -> Non
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--no-write", action="store_true", help="don't write a results file")
     parser.add_argument("--verbose", action="store_true", help="list every case outcome")
+    parser.add_argument("--out", metavar="PATH", help="also write a JSON report to PATH")
     args = parser.parse_args(argv)
 
     outcomes = run_all()
     summary = summarize(outcomes)
     _print_summary(summary, outcomes, args.verbose)
 
-    if not args.no_write:
-        RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
-        out = RESULTS_DIR / f"{stamp}.json"
+    if args.out:
+        out = Path(args.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(
             json.dumps(
                 {
-                    "generated_at": stamp,
+                    "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ"),
                     "summary": summary,
                     "cases": [o.to_dict() for o in outcomes],
                 },
@@ -95,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             + "\n"
         )
-        print(f"\nwrote {out.relative_to(Path.cwd()) if out.is_relative_to(Path.cwd()) else out}")
+        print(f"\nwrote {out}")
 
     return 1 if summary["failures"] else 0
 

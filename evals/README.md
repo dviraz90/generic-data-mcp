@@ -15,17 +15,22 @@ python -m evals.run
 ```
 
 ```
-python -m evals.run --no-write   # print only, don't write a results file
-python -m evals.run --verbose    # list every case outcome
+python -m evals.run --verbose          # list every case outcome
+python -m evals.run --out report.json   # additionally write a JSON report
 ```
 
 Exit status is non-zero if any case behaved unexpectedly, so it works in a pipeline.
 
+Nothing is written unless you ask for it, and no run output is committed. The run is
+deterministic and takes under a second, and `tests/test_boundary_corpus.py` asserts the
+same corpus on every push — so the reproduction is the artifact, and a checked-in copy
+of the numbers would only go stale.
+
 ## What the numbers mean
 
 ```
-adversarial inputs rejected : 79/79
-legitimate inputs accepted  : 28/28
+adversarial inputs rejected : 39/39
+legitimate inputs accepted  : 13/13
 ```
 
 - **adversarial inputs rejected** — inputs marked `"expect": "reject"` that the
@@ -63,8 +68,7 @@ corpus/
   identifier_cases.json   injection and shape cases for table/column names
   path_cases.json         traversal, symlink, and escape cases
 harness.py                loads and executes the corpus
-run.py                    CLI; writes results/<timestamp>.json
-results/                  committed run output
+run.py                    CLI
 ```
 
 The corpus files are **data**, consumed by two things: `run.py`, which produces the
@@ -99,7 +103,14 @@ What it is good for: it makes the README's claim checkable by a stranger in abou
 seconds, it names exactly which classes are covered, and it turns a regression into a
 red CI run instead of a silent hole.
 
-The first run of this corpus found one real defect (`SQLValidator` caught sqlglot's
-`ParseError` but not its sibling `TokenError`, so `'; DROP TABLE orders; --` was
-rejected with a raw third-party exception rather than a recovery-oriented message).
-That is the kind of thing it catches — not the kind of thing that proves absence.
+Building this corpus found two real defects, both now fixed and covered:
+
+- `SQLValidator` caught sqlglot's `ParseError` but not its sibling `TokenError`, so
+  `'; DROP TABLE orders; --` was rejected with a raw third-party exception instead of a
+  recovery-oriented message.
+- `validate_identifier` anchored with `$`, which in Python also matches just before a
+  trailing newline — so `"orders\n"` passed validation and was returned as a table name.
+  Every current caller has a second gate that caught it, so it was not exploitable, but
+  the validator was not enforcing the rule it documents.
+
+That is the kind of thing this catches — not the kind of thing that proves absence.

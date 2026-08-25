@@ -79,3 +79,14 @@ def test_validate_identifier_rejects_invalid_name():
 def test_validate_identifier_rejects_empty_name():
     with pytest.raises(SQLValidationError):
         validate_identifier("")
+
+
+def test_validate_identifier_rejects_trailing_newline():
+    """Python's `$` also matches just before a trailing newline.
+
+    With `$` the pattern accepted "orders\\n" and handed it back as a table name,
+    so the validator did not enforce the identifier rule it documents. `\\Z`
+    anchors at the true end of the string.
+    """
+    with pytest.raises(SQLValidationError):
+        validate_identifier("orders\n")
