@@ -14,6 +14,8 @@ dependencies = [
 ui = [
     "flask>=3",
     "openpyxl>=3.1",
+    # openpyxl switches to it automatically when installed, hardening XML parsing.
+    "defusedxml>=0.7",
 ]
 # Everything needed to run the full test suite (which exercises the GUI and
 # Excel ingestion), so `pip install -e ".[dev]"` alone is enough in CI.
