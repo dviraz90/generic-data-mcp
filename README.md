@@ -2,9 +2,19 @@
 
 An MCP server for querying data files, built on the assumption that the model is untrusted.
 Point it at a directory; the agent gets SQL and keyword search over it — with no code execution,
-no writes, and no path escape.
+no writes, and no path escape. The last two are measured: 39 adversarial inputs across 23 attack
+classes, all rejected, checked on every push.
 
 It ingests structured data files (CSV, TSV, pipe-delimited, JSON, JSONL) into SQLite and exposes them as queryable tools for an LLM. The user asks questions in natural language; the LLM composes the tools to answer.
+
+## Findings
+
+39/39 adversarial inputs rejected and 13/13 legitimate inputs accepted, across DML/DDL,
+`PRAGMA`/`ATTACH`, multi-statement, `SELECT … INTO`, identifier injection, and `..`/symlink path
+escape. Offline, deterministic, under a second: `python -m evals.run` (see [`evals/`](evals/)).
+Building the corpus found two validator bugs, both fixed. This covers the classes we listed, not the
+ones we didn't. Code execution via `load_extension()` is blocked by SQLite's default, not by the
+validator, and is not in the corpus.
 
 ## Tools
 
