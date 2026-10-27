@@ -4,6 +4,7 @@ import os
 import re
 import webbrowser
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.utils import secure_filename
@@ -16,6 +17,8 @@ _STATIC_DIR = Path(__file__).parent / "static"
 _MAX_UPLOAD_BYTES = 200 * 1024 * 1024  # 200 MB
 _TABLE_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _DEFAULT_PORT = 8765
+_LOCAL_HOSTNAMES = frozenset({"127.0.0.1", "localhost", "::1"})
+_SAFE_METHODS = frozenset({"GET", "HEAD"})
 
 
 def _sanitize_table_name(raw: str) -> str:
@@ -57,6 +60,38 @@ def create_app(
     app = Flask(__name__, static_folder=None)
     app.config["MAX_CONTENT_LENGTH"] = _MAX_UPLOAD_BYTES
     app.config["UPLOAD_DIR"] = upload_dir
+
+    def _forbidden(message: str):
+        return jsonify({"success": False, "error": message}), 403
+
+    @app.before_request
+    def guard_request_origin():
+        """Reject DNS-rebinding and cross-site requests.
+
+        Binding to 127.0.0.1 only stops other machines; any web page the user
+        visits can still make their browser talk to it. A foreign ``Host`` header
+        means DNS rebinding; a missing or foreign ``Origin`` on a state-changing
+        request means a cross-site form post (multipart posts skip CORS preflight).
+        """
+        hostname = urlsplit("//" + request.host).hostname
+        if hostname not in _LOCAL_HOSTNAMES:
+            return _forbidden(
+                f"Host '{request.host}' is not allowed. Open the console at "
+                "http://127.0.0.1:<port>/ or http://localhost:<port>/."
+            )
+        if request.method not in _SAFE_METHODS:
+            if request.headers.get("Origin") != f"http://{request.host}":
+                return _forbidden(
+                    "Cross-origin request rejected. Use the console page itself "
+                    "to upload files or run queries."
+                )
+
+    @app.after_request
+    def add_security_headers(response):
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        return response
 
     def _respond(result):
         status = 200 if result.success else 400
