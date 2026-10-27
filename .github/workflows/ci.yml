@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+# Least privilege: these jobs only read the repository.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -16,6 +20,10 @@ jobs:
           python-version: "3.11"
       - run: pip install -e ".[dev]"
       - run: python -m pytest tests/ -v
+      - name: Audit dependencies for known vulnerabilities
+        run: |
+          pip install pip-audit
+          pip-audit --skip-editable
 
   docker-build:
     runs-on: ubuntu-latest
