@@ -28,6 +28,13 @@ _FORBIDDEN_NODE_TYPES = (
     exp.Into,  # SELECT ... INTO, and INSERT/CREATE ... AS SELECT targets
 )
 
+# Functions that are valid inside a SELECT but are not read-only. load_extension
+# loads and runs a native shared library — code execution from a "read-only"
+# query. SQLite disables it by default, but that is a runtime setting, not
+# something this validator should rely on. Compared case-insensitively: SQLite
+# treats "load_extension", `LOAD_EXTENSION` and [load_extension] as the same call.
+_FORBIDDEN_FUNCTIONS = frozenset({"load_extension"})
+
 
 def normalize_identifier(name: str) -> str:
     """Coerce an arbitrary column/table header into a valid identifier.
@@ -97,6 +104,14 @@ class SQLValidator:
             if isinstance(node_obj, _FORBIDDEN_NODE_TYPES):
                 raise SQLValidationError(
                     f"Disallowed SQL construct: {type(node_obj).__name__}. "
+                    "Only read-only SELECT queries are permitted."
+                )
+            if (
+                isinstance(node_obj, exp.Anonymous)
+                and node_obj.name.lower() in _FORBIDDEN_FUNCTIONS
+            ):
+                raise SQLValidationError(
+                    f"Disallowed SQL function: {node_obj.name}(). "
                     "Only read-only SELECT queries are permitted."
                 )
 
