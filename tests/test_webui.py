@@ -14,6 +14,7 @@ from src.tools import (
     ToolRegistry,
 )
 from src.validators.path import PathValidator
+from src.webui import server as webui_server
 from src.webui.server import create_app
 
 
@@ -247,3 +248,24 @@ def test_failed_ingest_removes_saved_file(client, tmp_path):
     assert res.status_code == 400
     assert not (uploads / "again.csv").exists()
     assert (uploads / "ok.csv").exists()
+
+
+@pytest.mark.parametrize(
+    ("env", "expected_host"),
+    [({}, "127.0.0.1"), ({"MCP_UI_HOST": "0.0.0.0"}, "0.0.0.0")],  # noqa: S104
+)
+def test_main_binds_loopback_unless_host_overridden(monkeypatch, tmp_path, env, expected_host):
+    monkeypatch.setenv("MCP_DB_PATH", str(tmp_path / "db" / "store.db"))
+    monkeypatch.setenv("MCP_ALLOWED_DIRS", str(tmp_path / "data"))
+    monkeypatch.delenv("MCP_UI_HOST", raising=False)
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setattr(webui_server.webbrowser, "open", lambda _url: True)
+    bound = {}
+    monkeypatch.setattr(
+        webui_server.Flask, "run", lambda _self, host, port: bound.update(host=host, port=port)
+    )
+
+    webui_server.main()
+
+    assert bound == {"host": expected_host, "port": 8765}

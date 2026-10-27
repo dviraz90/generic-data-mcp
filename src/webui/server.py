@@ -190,6 +190,9 @@ def main() -> None:
     app = create_app(config=config)
 
     port = int(os.environ.get("MCP_UI_PORT", _DEFAULT_PORT))
+    # Loopback unless overridden. A container must bind 0.0.0.0 for its published
+    # port to be reachable; the Host/Origin guard still rejects non-local Host headers.
+    host = os.environ.get("MCP_UI_HOST", "127.0.0.1")
     url = f"http://127.0.0.1:{port}/"
     print(
         f"\n  generic-data-mcp upload console is running at:\n\n      {url}\n\n  Open it in your browser (Ctrl+C to stop).\n",
@@ -198,7 +201,7 @@ def main() -> None:
     # Best effort: the link is already printed, so a headless box needs no browser.
     with contextlib.suppress(Exception):
         webbrowser.open(url)
-    app.run(host="127.0.0.1", port=port)
+    app.run(host=host, port=port)
 
 
 if __name__ == "__main__":

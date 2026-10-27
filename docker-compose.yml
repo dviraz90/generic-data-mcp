@@ -1,27 +1,50 @@
+# Hardening shared by both services.
+x-hardened: &hardened
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: generic-data-mcp:dev
+  read_only: true
+  security_opt:
+    - "no-new-privileges:true"
+  cap_drop:
+    - ALL
+  mem_limit: 512m
+  pids_limit: 128
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+
 services:
   generic-data-mcp:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: generic-data-mcp:dev
+    <<: *hardened
     stdin_open: true   # required: keeps stdin open for MCP stdio transport
     tty: false         # required: TTY would corrupt MCP JSON-RPC framing on stdout
     network_mode: "none"
-    read_only: true
-    security_opt:
-      - "no-new-privileges:true"
-    cap_drop:
-      - ALL
-    mem_limit: 512m
-    pids_limit: 128
-    tmpfs:
-      - /tmp:size=64m,mode=1777
     volumes:
       - ./data:/data:ro   # user files; ingest_file only reads from here
       - db-data:/db    # SQLite DB isolated from the ingest-allowed tree
     environment:
       MCP_DB_PATH: /db/store.db
       MCP_ALLOWED_DIRS: /data
+
+  # Local upload console for humans: `docker compose up console`, then open
+  # http://localhost:8765/. Shares the same data dir and DB volume as the MCP
+  # service above. Unlike that service it needs a network (for the published
+  # port) and a writable /data (uploads are saved to /data/uploads).
+  console:
+    <<: *hardened
+    entrypoint: ["generic-data-mcp-ui"]
+    ports:
+      # Host loopback only: the console has no auth, so never publish it wider.
+      - "127.0.0.1:8765:8765"
+    volumes:
+      - ./data:/data   # rw: uploads land in /data/uploads (must be writable by uid 1000)
+      - db-data:/db
+    environment:
+      MCP_DB_PATH: /db/store.db
+      MCP_ALLOWED_DIRS: /data
+      MCP_UI_HOST: 0.0.0.0   # bind inside the container; the port mapping above keeps it loopback-only
+      MCP_UI_PORT: "8765"
 
 volumes:
   db-data:

@@ -251,4 +251,15 @@ On startup the console prints the link it's serving on and opens your browser to
 Override the port with `MCP_UI_PORT` (the printed link updates to match). Uploaded files are
 saved under `<first allowed dir>/uploads/` (e.g. `./data/uploads/`).
 
+**In Docker:** the compose file has a `console` service that shares `./data` and the DB volume
+with the MCP service:
+
+```bash
+docker compose up console      # then open http://localhost:8765/
+```
+
+The port is published to host loopback only (`127.0.0.1:8765`) because the console has no
+authentication. Uploads are written as uid 1000, so `./data` must be writable by it
+(`chmod a+w data` or `chown 1000 data` if uploads fail with a permission error).
+
 Run tests: `python -m pytest tests/ -v`
