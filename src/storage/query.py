@@ -4,15 +4,13 @@ import sqlite3
 import time
 from dataclasses import dataclass
 
-from src.exceptions import QueryTimeoutError
+from src.exceptions import QueryTimeoutError, SQLValidationError
 from src.validators.sql import SQLValidator
 
 _ROW_LIMIT = 1000
-DEFAULT_TIMEOUT_SECONDS = 10.0
-
-# SQLite calls the progress handler every N virtual-machine instructions. Small
-# enough that an overrun is caught within milliseconds, large enough that the
-# Python callback is negligible next to the query's own work.
+DEFAULT_TIMEOUT_SECONDS = 5.0
+# SQLite VM instructions between progress-handler calls: small enough to stop a
+# runaway query promptly, large enough that the callback overhead is negligible.
 _PROGRESS_INTERVAL = 10_000
 
 
@@ -24,11 +22,11 @@ class QueryResult:
 
 
 class QueryExecutor:
-    """Executes a single read-only SELECT statement, capped at 1000 rows and a time budget.
+    """Executes a single read-only SELECT statement, capped at 1000 rows.
 
-    The row cap bounds what is returned, not the work done: a valid SELECT such as
-    an unbounded recursive CTE never produces a row and would run forever, holding
-    the store's one shared connection. The deadline interrupts it instead.
+    Each query also has a wall-clock budget and a per-value size cap, so one
+    runaway statement (an unbounded recursive CTE, ``randomblob(1e9)``) cannot
+    freeze or exhaust the process every transport shares.
     """
 
     def __init__(
@@ -36,34 +34,47 @@ class QueryExecutor:
         connection: sqlite3.Connection,
         sql_validator: SQLValidator,
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+        max_value_bytes: int = 10_000_000,
     ):
         self._conn = connection
         self._validator = sql_validator
         self._timeout = timeout_seconds
+        self._conn.setlimit(sqlite3.SQLITE_LIMIT_LENGTH, max_value_bytes)
 
     def execute(self, sql: str) -> QueryResult:
         self._validator.validate(sql)
 
         deadline = time.monotonic() + self._timeout
-        # A truthy return from the handler makes SQLite abort the statement with
-        # OperationalError("interrupted"). It must also cover fetchmany, which is
-        # where most of the stepping happens.
-        self._conn.set_progress_handler(lambda: time.monotonic() > deadline, _PROGRESS_INTERVAL)
+        # A non-zero return aborts the running statement with "interrupted".
+        self._conn.set_progress_handler(
+            lambda: 1 if time.monotonic() > deadline else 0, _PROGRESS_INTERVAL
+        )
         try:
             cursor = self._conn.execute(sql)
             columns = [d[0] for d in cursor.description] if cursor.description else []
             rows = cursor.fetchmany(_ROW_LIMIT + 1)
-        except sqlite3.OperationalError as e:
-            if time.monotonic() <= deadline:
-                raise
-            raise QueryTimeoutError(
-                f"Query stopped after {self._timeout:g}s. Narrow it with WHERE or LIMIT, "
-                "make sure any recursive CTE has a terminating condition, and check table "
-                "sizes with list_datasets before joining large tables."
-            ) from e
+        except sqlite3.DatabaseError as e:
+            # "not authorized" for denied statements/functions, "...is prohibited"
+            # when the authorizer denies reading a table such as pragma_*.
+            if "not authorized" in str(e) or "is prohibited" in str(e):
+                raise SQLValidationError(
+                    "That function or table is not available in read-only queries. "
+                    "Use plain SELECTs over the loaded tables; call describe_table "
+                    "for column names and types."
+                ) from e
+            if "interrupted" in str(e):
+                raise QueryTimeoutError(
+                    f"Query exceeded the {self._timeout:g}s limit. Add a WHERE clause or "
+                    "LIMIT, or bound any recursive CTE."
+                ) from e
+            if "too big" in str(e):
+                raise QueryTimeoutError(
+                    "Query produced a value larger than the size limit. Select fewer or "
+                    "smaller columns, or use substr() on large text."
+                ) from e
+            raise
         finally:
             self._conn.set_progress_handler(None, 0)
-
         truncated = len(rows) > _ROW_LIMIT
         if truncated:
             rows = rows[:_ROW_LIMIT]

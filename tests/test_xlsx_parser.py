@@ -78,3 +78,36 @@ def test_empty_sheet_raises_parse_error(tmp_path):
         pass
     else:
         raise AssertionError("Expected ParseError for an empty sheet")
+
+
+def test_oversized_uncompressed_workbook_rejected(tmp_path):
+    xlsx_path = tmp_path / "big.xlsx"
+    _write_workbook(xlsx_path, [["a"], ["x" * 1000]])
+
+    import pytest
+    from src.exceptions import ParseError
+
+    with pytest.raises(ParseError, match="Export the sheet to CSV"):
+        list(XLSXParser(max_uncompressed_bytes=100).parse(xlsx_path))
+
+
+def test_suspicious_compression_ratio_rejected(tmp_path):
+    import pytest
+    from src.exceptions import ParseError
+
+    xlsx_path = tmp_path / "bomb.xlsx"
+    _write_workbook(xlsx_path, [["a"], ["x" * 100_000]])
+    parser = XLSXParser(max_ratio=5)
+    parser._RATIO_CHECK_FLOOR = 0  # exercise the ratio branch on a small file
+    with pytest.raises(ParseError, match="compression ratio"):
+        list(parser.parse(xlsx_path))
+
+
+def test_corrupt_zip_gives_parse_error(tmp_path):
+    import pytest
+    from src.exceptions import ParseError
+
+    bad = tmp_path / "bad.xlsx"
+    bad.write_bytes(b"not a zip")
+    with pytest.raises(ParseError, match="not a valid .xlsx"):
+        list(XLSXParser().parse(bad))

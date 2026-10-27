@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import os
 import re
+import uuid
 import webbrowser
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.utils import secure_filename
@@ -16,6 +18,8 @@ _STATIC_DIR = Path(__file__).parent / "static"
 _MAX_UPLOAD_BYTES = 200 * 1024 * 1024  # 200 MB
 _TABLE_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _DEFAULT_PORT = 8765
+_LOCAL_HOSTNAMES = frozenset({"127.0.0.1", "localhost", "::1"})
+_SAFE_METHODS = frozenset({"GET", "HEAD"})
 
 
 def _sanitize_table_name(raw: str) -> str:
@@ -35,6 +39,23 @@ def _sanitize_table_name(raw: str) -> str:
 def _upload_dir_for(config: Config) -> Path:
     """The directory uploaded files are saved into: <first allowed dir>/uploads."""
     return config.allowed_dirs[0] / "uploads"
+
+
+def _save_unique(file, directory: Path, filename: str) -> Path:
+    """Save the upload without ever replacing an existing file.
+
+    Exclusive creation ("xb") makes the existence check and the create atomic;
+    on a name collision the file is saved under a short random suffix instead.
+    """
+    path = directory / filename
+    while True:
+        try:
+            with path.open("xb") as out:
+                file.save(out)
+            return path
+        except FileExistsError:
+            stem, suffix = Path(filename).stem, Path(filename).suffix
+            path = directory / f"{stem}-{uuid.uuid4().hex[:8]}{suffix}"
 
 
 def create_app(
@@ -58,6 +79,42 @@ def create_app(
     app.config["MAX_CONTENT_LENGTH"] = _MAX_UPLOAD_BYTES
     app.config["UPLOAD_DIR"] = upload_dir
 
+    def _forbidden(message: str):
+        return jsonify({"success": False, "error": message}), 403
+
+    @app.before_request
+    def guard_request_origin():
+        """Reject DNS-rebinding and cross-site requests.
+
+        Binding to 127.0.0.1 only stops other machines; any web page the user
+        visits can still make their browser talk to it. A foreign ``Host`` header
+        means DNS rebinding; a missing or foreign ``Origin`` on a state-changing
+        request means a cross-site form post (multipart posts skip CORS preflight).
+        """
+        hostname = urlsplit("//" + request.host).hostname
+        if hostname not in _LOCAL_HOSTNAMES:
+            return _forbidden(
+                f"Host '{request.host}' is not allowed. Open the console at "
+                "http://127.0.0.1:<port>/ or http://localhost:<port>/."
+            )
+        if request.method not in _SAFE_METHODS:
+            if request.headers.get("Origin") != f"http://{request.host}":
+                return _forbidden(
+                    "Cross-origin request rejected. Use the console page itself "
+                    "to upload files or run queries."
+                )
+
+    @app.after_request
+    def add_security_headers(response):
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        # No inline script or style: markup injected via an ingested value can't run.
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+        )
+        return response
+
     def _respond(result):
         status = 200 if result.success else 400
         return jsonify(result.to_dict()), status
@@ -65,6 +122,11 @@ def create_app(
     @app.get("/")
     def index():
         return send_from_directory(_STATIC_DIR, "index.html")
+
+    @app.get("/static/<path:filename>")
+    def static_asset(filename: str):
+        # send_from_directory rejects paths that escape _STATIC_DIR.
+        return send_from_directory(_STATIC_DIR, filename)
 
     @app.get("/api/datasets")
     def list_datasets():
@@ -97,12 +159,14 @@ def create_app(
             return jsonify({"success": False, "error": "Could not derive a valid table name. Provide a table_name matching [A-Za-z_][A-Za-z0-9_]*."}), 400
 
         upload_dir.mkdir(parents=True, exist_ok=True)
-        saved_path = upload_dir / filename
-        file.save(str(saved_path))
+        saved_path = _save_unique(file, upload_dir, filename)
 
         result = registry.call(
             "ingest_file", {"path": str(saved_path), "table_name": table_name}
         )
+        if not result.success:
+            # Don't leave rejected files behind in the ingest-allowed directory.
+            saved_path.unlink(missing_ok=True)
         return _respond(result)
 
     return app

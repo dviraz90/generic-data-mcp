@@ -159,13 +159,13 @@ def test_runaway_query_is_stopped_with_a_recoverable_error(tmp_path):
     )
 
     assert not result.success
-    assert "stopped after 0.2s" in result.error
+    assert "exceeded the 0.2s limit" in result.error
     # The connection is still usable, and the progress handler was cleared.
     assert registry.call("query", {"sql": "SELECT 1"}).success
 
 
-@pytest.mark.parametrize("limit", [0, -1, "10", True])
-def test_search_rejects_invalid_limit(workspace, limit):
+@pytest.mark.parametrize("limit", ["10", 2.5, True])
+def test_search_rejects_non_integer_limit(workspace, limit):
     registry, csv_path = workspace
     registry.call("ingest_file", {"path": str(csv_path), "table_name": "orders"})
     registry.call("search", {"action": "enable", "table_name": "orders", "columns": ["note"]})
@@ -175,7 +175,22 @@ def test_search_rejects_invalid_limit(workspace, limit):
     )
 
     assert not result.success
-    assert "positive integer" in result.error
+    assert "integer" in result.error
+
+
+@pytest.mark.parametrize("limit", [0, -1])
+def test_search_clamps_non_positive_limit_to_one(workspace, limit):
+    # -1 means "no limit" to SQLite, so it must never reach the store unchanged.
+    registry, csv_path = workspace
+    registry.call("ingest_file", {"path": str(csv_path), "table_name": "orders"})
+    registry.call("search", {"action": "enable", "table_name": "orders", "columns": ["note"]})
+
+    result = registry.call(
+        "search", {"action": "search", "table_name": "orders", "query": "the", "limit": limit}
+    )
+
+    assert result.success
+    assert len(result.data["results"]) == 1
 
 
 def test_search_limit_is_capped(workspace, monkeypatch):

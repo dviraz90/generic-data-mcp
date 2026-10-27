@@ -121,7 +121,7 @@ Building this corpus found four real gaps, all now fixed and covered:
 - An unbounded recursive CTE is a valid read-only SELECT, and it never returns. The
   1000-row cap bounds what comes back, not the work done, so it ran forever on the
   store's one shared connection and hung every tool. Queries now run under a deadline
-  (10s by default) enforced by SQLite's progress handler. The `query` cases run against
+  (5s by default) enforced by SQLite's progress handler. The `query` cases run against
   a live store with a 0.5s budget, which is why the whole run takes about a second.
 
 That is the kind of thing this catches — not the kind of thing that proves absence.

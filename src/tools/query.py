@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from src.exceptions import GenericDataMCPError
+from src.storage.query import DEFAULT_TIMEOUT_SECONDS
 from src.storage.sqlite_store import SQLiteStore
 from src.tools.base import BaseTool, ToolResult
 
@@ -11,8 +12,8 @@ class QueryTool(BaseTool):
     name = "query"
     description = (
         "Run a single read-only SELECT statement against the loaded tables. "
-        "Results are capped at 1000 rows, and a query that runs longer than 10 seconds is "
-        "stopped. Only SELECT/WITH...SELECT/UNION are allowed; "
+        f"Results are capped at 1000 rows, and a query that runs longer than "
+        f"{DEFAULT_TIMEOUT_SECONDS:g} seconds is stopped. Only SELECT/WITH...SELECT/UNION are allowed; "
         "call describe_table first if you don't know the schema."
     )
     input_schema = {

@@ -6,9 +6,9 @@ from src.exceptions import GenericDataMCPError
 from src.storage.sqlite_store import SQLiteStore
 from src.tools.base import BaseTool, ToolResult
 
-# Same ceiling as the query tool's row cap, so search can't be used to pull an
-# unbounded result set that query would refuse.
-_MAX_RESULTS = 1000
+# Same ceiling as the query tool's row cap, so search can't pull an unbounded
+# result set that query would refuse.
+_MAX_LIMIT = 1000
 
 
 class SearchTool(BaseTool):
@@ -32,8 +32,8 @@ class SearchTool(BaseTool):
             "limit": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": _MAX_RESULTS,
-                "description": f"Max results for 'search', default 50, capped at {_MAX_RESULTS}.",
+                "maximum": _MAX_LIMIT,
+                "description": f"Max results for 'search', default 50, capped at {_MAX_LIMIT}.",
             },
         },
         "required": ["action", "table_name"],
@@ -60,13 +60,12 @@ class SearchTool(BaseTool):
                 query = arguments.get("query", "")
                 if not query:
                     return ToolResult.fail("The 'search' action requires a non-empty 'query' string.")
-                limit = arguments.get("limit", 50)
-                # bool is an int subclass; True would otherwise pass as limit=1.
-                if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
-                    return ToolResult.fail(
-                        f"'limit' must be a positive integer (at most {_MAX_RESULTS})."
-                    )
-                limit = min(limit, _MAX_RESULTS)
+                limit = arguments.get("limit")
+                if limit is None:
+                    limit = 50
+                if isinstance(limit, bool) or not isinstance(limit, int):
+                    return ToolResult.fail("'limit' must be an integer between 1 and 1000.")
+                limit = max(1, min(limit, _MAX_LIMIT))
                 results = self._store.search(table_name, query, limit)
                 return ToolResult.ok(table_name=table_name, query=query, results=results)
 

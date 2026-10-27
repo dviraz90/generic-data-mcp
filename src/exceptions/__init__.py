@@ -23,4 +23,4 @@ class TableNotFoundError(GenericDataMCPError):
 
 
 class QueryTimeoutError(GenericDataMCPError):
-    """Raised when a query runs past its time budget and is interrupted."""
+    """Raised when a query exceeds its time or value-size budget."""

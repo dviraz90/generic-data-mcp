@@ -23,7 +23,7 @@ the ones we didn't.
 | `ingest_file` | Parse a file, infer types, create a SQLite table |
 | `list_datasets` | Show every loaded table with row counts and source paths |
 | `describe_table` | Schema + sample rows for one table |
-| `query` | Run a read-only SELECT (single statement, capped at 1000 rows and 10 seconds) |
+| `query` | Run a read-only SELECT (single statement, capped at 1000 rows and 5 seconds) |
 | `search` | Enable FTS5 on (table, columns), then run keyword searches |
 
 ## Design notes
@@ -179,7 +179,7 @@ JSON examples below.
       "args": [
         "run", "--rm", "-i",
         "--network", "none",
-        "-v", "/absolute/path/to/data:/data",
+        "-v", "/absolute/path/to/data:/data:ro",
         "-v", "/absolute/path/to/db:/db",
         "-e", "MCP_DB_PATH=/db/store.db",
         "-e", "MCP_ALLOWED_DIRS=/data",

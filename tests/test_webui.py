@@ -39,6 +39,9 @@ def client(tmp_path):
     return app.test_client()
 
 
+_SAME_ORIGIN = {"Origin": "http://localhost"}
+
+
 def _upload_orders(client, table_name=None):
     csv = (
         "id,customer,amount,note\n"
@@ -49,7 +52,9 @@ def _upload_orders(client, table_name=None):
     data = {"file": (io.BytesIO(csv.encode()), "orders.csv")}
     if table_name is not None:
         data["table_name"] = table_name
-    return client.post("/api/upload", data=data, content_type="multipart/form-data")
+    return client.post(
+        "/api/upload", data=data, content_type="multipart/form-data", headers=_SAME_ORIGIN
+    )
 
 
 def test_upload_returns_schema(client):
@@ -94,6 +99,7 @@ def test_query_select_returns_rows(client):
     res = client.post(
         "/api/query",
         json={"sql": "SELECT customer FROM orders WHERE amount > 12 ORDER BY customer"},
+        headers=_SAME_ORIGIN,
     )
     assert res.status_code == 200
     body = res.get_json()
@@ -103,7 +109,9 @@ def test_query_select_returns_rows(client):
 
 def test_query_non_select_rejected(client):
     _upload_orders(client)
-    res = client.post("/api/query", json={"sql": "DROP TABLE orders"})
+    res = client.post(
+        "/api/query", json={"sql": "DROP TABLE orders"}, headers=_SAME_ORIGIN
+    )
     assert res.status_code == 400
     body = res.get_json()
     assert body["success"] is False
@@ -117,7 +125,9 @@ def test_upload_derives_table_name_from_supplied_value(client):
 
 
 def test_upload_missing_file_rejected(client):
-    res = client.post("/api/upload", data={}, content_type="multipart/form-data")
+    res = client.post(
+        "/api/upload", data={}, content_type="multipart/form-data", headers=_SAME_ORIGIN
+    )
     assert res.status_code == 400
     assert res.get_json()["success"] is False
 
@@ -126,3 +136,109 @@ def test_index_served(client):
     res = client.get("/")
     assert res.status_code == 200
     assert b"Ingestion Console" in res.data
+
+
+def test_upload_with_foreign_origin_rejected(client):
+    csv = io.BytesIO(b"a,b\n1,2\n")
+    res = client.post(
+        "/api/upload",
+        data={"file": (csv, "evil.csv")},
+        content_type="multipart/form-data",
+        headers={"Origin": "https://evil.example"},
+    )
+    assert res.status_code == 403
+    assert res.get_json()["success"] is False
+    assert client.get("/api/datasets").get_json()["datasets"] == []
+
+
+def test_upload_without_origin_rejected(client):
+    csv = io.BytesIO(b"a,b\n1,2\n")
+    res = client.post(
+        "/api/upload", data={"file": (csv, "x.csv")}, content_type="multipart/form-data"
+    )
+    assert res.status_code == 403
+
+
+def test_query_with_foreign_origin_rejected(client):
+    res = client.post(
+        "/api/query", json={"sql": "SELECT 1"}, headers={"Origin": "https://evil.example"}
+    )
+    assert res.status_code == 403
+
+
+@pytest.mark.parametrize("host", ["evil.example", "rebind.evil.example:8765", "127.0.0.1.evil.example"])
+def test_foreign_host_rejected_on_reads(client, host):
+    res = client.get("/api/datasets", headers={"Host": host})
+    assert res.status_code == 403
+    assert res.get_json()["success"] is False
+
+
+@pytest.mark.parametrize("host", ["127.0.0.1:8765", "localhost:8765", "[::1]:8765"])
+def test_local_hosts_allowed(client, host):
+    res = client.get("/api/datasets", headers={"Host": host})
+    assert res.status_code == 200
+    res = client.post(
+        "/api/query", json={"sql": "SELECT 1"}, headers={"Host": host, "Origin": f"http://{host}"}
+    )
+    assert res.status_code == 200
+
+
+def test_security_headers_set(client):
+    res = client.get("/")
+    assert res.headers["X-Content-Type-Options"] == "nosniff"
+    assert res.headers["X-Frame-Options"] == "DENY"
+    assert res.headers["Referrer-Policy"] == "no-referrer"
+
+
+def test_csp_header_set(client):
+    csp = client.get("/").headers["Content-Security-Policy"]
+    assert "default-src 'self'" in csp
+    assert "unsafe-inline" not in csp
+    assert "frame-ancestors 'none'" in csp
+
+
+def test_static_assets_served_and_confined(client):
+    assert client.get("/static/app.js").status_code == 200
+    assert client.get("/static/app.css").status_code == 200
+    assert client.get("/static/../server.py").status_code == 404
+    assert client.get("/static/%2e%2e/server.py").status_code == 404
+
+
+def test_page_has_no_inline_script_style_or_innerhtml(client):
+    html = client.get("/").get_data(as_text=True)
+    assert "<style" not in html
+    assert 'style="' not in html
+    assert "onclick=" not in html
+    assert "</script>" in html and "<script src=" in html
+    inline = [s for s in html.split("<script")[1:] if s.split(">", 1)[1].split("</script>")[0].strip()]
+    assert inline == []
+    assert "innerHTML" not in client.get("/static/app.js").get_data(as_text=True)
+
+
+def _post_csv(client, name, content, table=None):
+    data = {"file": (io.BytesIO(content), name)}
+    if table:
+        data["table_name"] = table
+    return client.post(
+        "/api/upload", data=data, content_type="multipart/form-data", headers=_SAME_ORIGIN
+    )
+
+
+def test_same_name_upload_does_not_overwrite(client, tmp_path):
+    uploads = tmp_path / "data" / "uploads"
+    first = _post_csv(client, "dup.csv", b"a,b\n1,first\n", table="one")
+    second = _post_csv(client, "dup.csv", b"a,b\n2,second\n", table="two")
+    assert first.status_code == 200 and second.status_code == 200
+    assert (uploads / "dup.csv").read_text() == "a,b\n1,first\n"
+    assert len(list(uploads.glob("dup*.csv"))) == 2
+    sources = {d["table_name"]: d["source_path"] for d in client.get("/api/datasets").get_json()["datasets"]}
+    assert sources["one"] != sources["two"]
+
+
+def test_failed_ingest_removes_saved_file(client, tmp_path):
+    uploads = tmp_path / "data" / "uploads"
+    assert _post_csv(client, "ok.csv", b"a\n1\n", table="taken").status_code == 200
+    res = _post_csv(client, "again.csv", b"a\n2\n", table="taken")  # table exists
+    assert res.status_code == 400
+    assert not (uploads / "again.csv").exists()
+    assert (uploads / "ok.csv").exists()
