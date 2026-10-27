@@ -91,6 +91,10 @@ def create_app(
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
+        # No inline script or style: markup injected via an ingested value can't run.
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+        )
         return response
 
     def _respond(result):
@@ -100,6 +104,11 @@ def create_app(
     @app.get("/")
     def index():
         return send_from_directory(_STATIC_DIR, "index.html")
+
+    @app.get("/static/<path:filename>")
+    def static_asset(filename: str):
+        # send_from_directory rejects paths that escape _STATIC_DIR.
+        return send_from_directory(_STATIC_DIR, filename)
 
     @app.get("/api/datasets")
     def list_datasets():

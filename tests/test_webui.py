@@ -188,3 +188,28 @@ def test_security_headers_set(client):
     assert res.headers["X-Content-Type-Options"] == "nosniff"
     assert res.headers["X-Frame-Options"] == "DENY"
     assert res.headers["Referrer-Policy"] == "no-referrer"
+
+
+def test_csp_header_set(client):
+    csp = client.get("/").headers["Content-Security-Policy"]
+    assert "default-src 'self'" in csp
+    assert "unsafe-inline" not in csp
+    assert "frame-ancestors 'none'" in csp
+
+
+def test_static_assets_served_and_confined(client):
+    assert client.get("/static/app.js").status_code == 200
+    assert client.get("/static/app.css").status_code == 200
+    assert client.get("/static/../server.py").status_code == 404
+    assert client.get("/static/%2e%2e/server.py").status_code == 404
+
+
+def test_page_has_no_inline_script_style_or_innerhtml(client):
+    html = client.get("/").get_data(as_text=True)
+    assert "<style" not in html
+    assert 'style="' not in html
+    assert "onclick=" not in html
+    assert "</script>" in html and "<script src=" in html
+    inline = [s for s in html.split("<script")[1:] if s.split(">", 1)[1].split("</script>")[0].strip()]
+    assert inline == []
+    assert "innerHTML" not in client.get("/static/app.js").get_data(as_text=True)
