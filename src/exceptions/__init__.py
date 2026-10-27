@@ -20,3 +20,7 @@ class SQLValidationError(GenericDataMCPError):
 
 class TableNotFoundError(GenericDataMCPError):
     """Raised when a referenced table does not exist."""
+
+
+class QueryTimeoutError(GenericDataMCPError):
+    """Raised when a query exceeds its time or value-size budget."""
