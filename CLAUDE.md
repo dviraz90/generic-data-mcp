@@ -24,9 +24,14 @@ python -m pytest tests/ -v
 
 # Run a single test
 python -m pytest tests/test_e2e.py::test_ingest_then_query -v
+
+# Lint, format and type-check (same pinned versions CI uses; install with ".[dev]")
+ruff check src tests
+ruff format --check src tests   # drop --check to apply formatting
+mypy                            # strict, over src/ (configured in pyproject.toml)
 ```
 
-No linter is configured. No build step is needed beyond `pip install -e .`.
+CI runs all of the above plus the tests on Python 3.11–3.13, `pip-audit`, and a `docker build`. No build step is needed beyond `pip install -e .`.
 
 ## Architecture
 

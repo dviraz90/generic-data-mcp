@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from src.exceptions import GenericDataMCPError
 from src.storage.sqlite_store import SQLiteStore
@@ -16,7 +16,7 @@ class SearchTool(BaseTool):
         "(table_name, columns) pair with FTS5 — call this once before searching a "
         "table; 'search' runs a keyword query against an already-enabled table."
     )
-    input_schema = {
+    input_schema: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "action": {"type": "string", "enum": ["enable", "search"]},
@@ -27,7 +27,10 @@ class SearchTool(BaseTool):
                 "description": "Required for the 'enable' action.",
             },
             "query": {"type": "string", "description": "Required for the 'search' action."},
-            "limit": {"type": "integer", "description": "Max results for 'search' (1-1000), default 50."},
+            "limit": {
+                "type": "integer",
+                "description": "Max results for 'search' (1-1000), default 50.",
+            },
         },
         "required": ["action", "table_name"],
     }
@@ -35,7 +38,7 @@ class SearchTool(BaseTool):
     def __init__(self, store: SQLiteStore):
         self._store = store
 
-    def execute(self, arguments: dict[str, Any]) -> ToolResult:
+    def execute(self, arguments: dict[str, Any]) -> ToolResult:  # noqa: PLR0911 -- one early return per invalid argument
         action = arguments.get("action")
         table_name = arguments.get("table_name", "")
 
@@ -52,7 +55,9 @@ class SearchTool(BaseTool):
             if action == "search":
                 query = arguments.get("query", "")
                 if not query:
-                    return ToolResult.fail("The 'search' action requires a non-empty 'query' string.")
+                    return ToolResult.fail(
+                        "The 'search' action requires a non-empty 'query' string."
+                    )
                 limit = arguments.get("limit")
                 if limit is None:
                     limit = 50

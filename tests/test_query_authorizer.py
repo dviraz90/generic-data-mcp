@@ -9,7 +9,11 @@ from src.storage.sqlite_store import SQLiteStore
 @pytest.fixture
 def store(tmp_path):
     s = SQLiteStore(tmp_path / "store.db")
-    s.ingest("orders", "orders.csv", iter([{"id": "1", "customer": "Alice"}, {"id": "2", "customer": "Bob"}]))
+    s.ingest(
+        "orders",
+        "orders.csv",
+        iter([{"id": "1", "customer": "Alice"}, {"id": "2", "customer": "Bob"}]),
+    )
     yield s
     s.close()
 
@@ -43,15 +47,22 @@ def test_load_extension_is_denied_at_both_layers(store):
 
 def test_query_connection_cannot_write(store):
     # Bypass the SQL validator to prove the connection itself is read-only.
-    for sql in ("DELETE FROM orders", "CREATE TABLE x (a)", "ATTACH ':memory:' AS m", "PRAGMA journal_mode=DELETE"):
-        with pytest.raises(Exception):
+    for sql in (
+        "DELETE FROM orders",
+        "CREATE TABLE x (a)",
+        "ATTACH ':memory:' AS m",
+        "PRAGMA journal_mode=DELETE",
+    ):
+        with pytest.raises(sqlite3.DatabaseError):
             store._query_connection.execute(sql)
     assert store.query("SELECT COUNT(*) FROM orders").rows == [(2,)]
 
 
 def test_normal_queries_still_work(store):
     assert store.query("SELECT customer FROM orders ORDER BY id").rows == [("Alice",), ("Bob",)]
-    joined = store.query("SELECT a.id, b.id FROM orders a JOIN orders b ON a.id = b.id ORDER BY a.id")
+    joined = store.query(
+        "SELECT a.id, b.id FROM orders a JOIN orders b ON a.id = b.id ORDER BY a.id"
+    )
     assert joined.rows == [(1, 1), (2, 2)]
     cte = store.query(
         "WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM c WHERE x < 5) SELECT x FROM c"

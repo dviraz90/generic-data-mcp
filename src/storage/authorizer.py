@@ -49,7 +49,11 @@ class QueryAuthorizer:
         source: str | None,
     ) -> int:
         if action == sqlite3.SQLITE_PRAGMA:
-            return sqlite3.SQLITE_OK if (arg1 or "").lower() in _ALLOWED_PRAGMAS else sqlite3.SQLITE_DENY
+            return (
+                sqlite3.SQLITE_OK
+                if (arg1 or "").lower() in _ALLOWED_PRAGMAS
+                else sqlite3.SQLITE_DENY
+            )
         if action not in _ALLOWED_ACTIONS:
             return sqlite3.SQLITE_DENY
         if action == sqlite3.SQLITE_FUNCTION and (arg2 or "").lower() in _DENIED_FUNCTIONS:

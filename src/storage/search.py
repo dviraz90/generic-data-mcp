@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from typing import Any
 
 from src.exceptions import GenericDataMCPError
 from src.storage.tables import TableManager
@@ -92,7 +93,7 @@ class SearchIndex:
         self._conn.commit()
         return fts_table
 
-    def search(self, table_name: str, query: str, limit: int = 50) -> list[dict]:
+    def search(self, table_name: str, query: str, limit: int = 50) -> list[dict[str, Any]]:
         validate_identifier(table_name)
         if not self.is_enabled(table_name):
             raise GenericDataMCPError(
@@ -113,4 +114,4 @@ class SearchIndex:
             (query, limit),
         )
         columns = [d[0] for d in cursor.description]
-        return [dict(zip(columns, row)) for row in cursor.fetchall()]
+        return [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]
