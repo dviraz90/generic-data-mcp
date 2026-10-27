@@ -18,7 +18,6 @@ def store(tmp_path):
         "SELECT fts3_tokenizer('simple')",
         "SELECT fts3_tokenizer('simple', x'4141414141414141')",
         "SELECT hex(fts3_tokenizer('simple', fts3_tokenizer('porter')))",
-        "SELECT load_extension('/tmp/x')",
         "SELECT * FROM pragma_database_list",
         "SELECT * FROM pragma_compile_options",
         "SELECT name FROM pragma_table_info('orders')",
@@ -27,6 +26,16 @@ def store(tmp_path):
 def test_dangerous_calls_are_denied(store, sql):
     with pytest.raises(SQLValidationError, match="not available in read-only"):
         store.query(sql)
+
+
+def test_load_extension_is_blocked_at_both_layers(store):
+    sql = "SELECT load_extension('/tmp/x')"
+    # The SQL validator rejects it by name before it reaches SQLite...
+    with pytest.raises(SQLValidationError, match="Disallowed SQL function"):
+        store.query(sql)
+    # ...and the authorizer still denies it if something ever bypasses the validator.
+    with pytest.raises(Exception, match="not authorized"):
+        store._query_connection.execute(sql)
 
 
 def test_query_connection_cannot_write(store):
