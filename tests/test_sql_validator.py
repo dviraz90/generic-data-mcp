@@ -67,6 +67,29 @@ def test_rejects_unterminated_quote_as_our_own_error(validator):
         validator.validate("'; DROP TABLE orders; --")
 
 
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT load_extension('/tmp/evil.so')",
+        "SELECT * FROM t WHERE load_extension('x') IS NULL",
+        "WITH a AS (SELECT load_extension('x')) SELECT * FROM a",
+        "SELECT \"LOAD_EXTENSION\"('x', 'init')",
+    ],
+)
+def test_rejects_load_extension(validator, sql):
+    """load_extension is a valid SELECT expression that runs native code.
+
+    SQLite disables it by default, but the validator should not depend on
+    that runtime setting to keep "read-only" true.
+    """
+    with pytest.raises(SQLValidationError):
+        validator.validate(sql)
+
+
+def test_allows_ordinary_anonymous_function(validator):
+    validator.validate("SELECT printf('%d', id) FROM orders")
+
+
 def test_validate_identifier_accepts_valid_name():
     assert validate_identifier("orders_2024") == "orders_2024"
 

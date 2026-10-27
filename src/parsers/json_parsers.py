@@ -24,7 +24,19 @@ class JSONParser(BaseParser):
     name = "json"
     extensions = (".json",)
 
+    def __init__(self, max_bytes: int = 100 * 1024 * 1024):
+        # json.load reads the whole document into memory, unlike the streaming
+        # parsers, so cap it.
+        self._max_bytes = max_bytes
+
     def parse(self, path: Path) -> Iterator[dict[str, str]]:
+        size = path.stat().st_size
+        if size > self._max_bytes:
+            raise ParseError(
+                f"'{path}' is {size:,} bytes, over the {self._max_bytes:,}-byte limit for .json "
+                "files (they are loaded into memory whole). Convert it to JSON Lines (.jsonl), "
+                "which streams, or split the file."
+            )
         try:
             with path.open("r", encoding="utf-8") as f:
                 data = json.load(f)

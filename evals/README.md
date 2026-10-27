@@ -29,15 +29,15 @@ of the numbers would only go stale.
 ## What the numbers mean
 
 ```
-adversarial inputs rejected : 39/39
-legitimate inputs accepted  : 13/13
+adversarial inputs rejected : 42/42
+legitimate inputs accepted  : 14/14
 ```
 
 - **adversarial inputs rejected** — inputs marked `"expect": "reject"` that the
   validators refused. This is the security number.
 - **legitimate inputs accepted** — inputs marked `"expect": "allow"` that passed.
   This is the number that keeps the first one honest: a validator that rejects
-  *everything* would score 79/79 on the first line while being useless. Both must
+  *everything* would score 42/42 on the first line while being useless. Both must
   be perfect for the result to mean anything.
 - **off-contract rejections** — inputs that were rejected, but by an exception type
   other than the one the validator documents (`SQLValidationError` /
@@ -51,7 +51,7 @@ Per-class counts show which attack families are covered and how densely.
 
 | Target | Validator | Classes |
 |---|---|---|
-| SQL | `SQLValidator` (`src/validators/sql.py`) | `dml_insert`, `dml_update`, `dml_delete`, `dml_replace`, `dml_upsert`, `ddl_drop`, `ddl_create`, `ddl_alter`, `pragma`, `attach`, `maintenance`, `multi_statement`, `select_into`, `comment_smuggling`, `unparseable`, `empty` |
+| SQL | `SQLValidator` (`src/validators/sql.py`) | `dml_insert`, `dml_update`, `dml_delete`, `dml_replace`, `dml_upsert`, `ddl_drop`, `ddl_create`, `ddl_alter`, `pragma`, `attach`, `maintenance`, `code_execution`, `multi_statement`, `select_into`, `comment_smuggling`, `unparseable`, `empty` |
 | Identifiers | `validate_identifier` (`src/validators/sql.py`) | `identifier_injection`, `identifier_shape` |
 | Paths | `PathValidator` (`src/validators/path.py`) | `traversal`, `symlink`, `absolute`, `store_readback`, `path_shape` |
 
@@ -103,7 +103,7 @@ What it is good for: it makes the README's claim checkable by a stranger in abou
 seconds, it names exactly which classes are covered, and it turns a regression into a
 red CI run instead of a silent hole.
 
-Building this corpus found two real defects, both now fixed and covered:
+Building this corpus found three real gaps, all now fixed and covered:
 
 - `SQLValidator` caught sqlglot's `ParseError` but not its sibling `TokenError`, so
   `'; DROP TABLE orders; --` was rejected with a raw third-party exception instead of a
@@ -112,5 +112,10 @@ Building this corpus found two real defects, both now fixed and covered:
   trailing newline — so `"orders\n"` passed validation and was returned as a table name.
   Every current caller has a second gate that caught it, so it was not exploitable, but
   the validator was not enforcing the rule it documents.
+- `SELECT load_extension('/tmp/x.so')` is a valid SELECT, so it passed `SQLValidator`.
+  It loads and runs a native library. SQLite disables extension loading by default, so it
+  failed at runtime with `not authorized` — but "no code execution" was resting on a
+  runtime setting rather than on the validator. It is now rejected by name, which also
+  covers the quoted and bracketed spellings SQLite accepts.
 
 That is the kind of thing this catches — not the kind of thing that proves absence.

@@ -43,7 +43,7 @@ def build_entry(db_path: Path, allowed_dirs: Path, docker: bool, image: str, com
             "args": [
                 "run", "--rm", "-i",
                 "--network", "none",
-                "-v", f"{allowed_dirs}:/data",
+                "-v", f"{allowed_dirs}:/data:ro",
                 "-v", f"{db_path.parent}:/db",
                 "-e", "MCP_DB_PATH=/db/store.db",
                 "-e", "MCP_ALLOWED_DIRS=/data",

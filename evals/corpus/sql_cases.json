@@ -7,6 +7,7 @@
   {"id": "sql-allow-06", "class": "select_union", "expect": "allow", "input": "SELECT id FROM a UNION SELECT id FROM b", "note": "union root — exp.Union"},
   {"id": "sql-allow-07", "class": "select_subquery", "expect": "allow", "input": "SELECT * FROM (SELECT id, total FROM orders) sub WHERE sub.total > 50", "note": "derived table"},
   {"id": "sql-allow-08", "class": "select_expr", "expect": "allow", "input": "SELECT id, ROW_NUMBER() OVER (PARTITION BY status ORDER BY total) AS rn FROM orders", "note": "window function"},
+  {"id": "sql-allow-09", "class": "select_expr", "expect": "allow", "input": "SELECT printf('%d', id) FROM orders", "note": "ordinary function that parses as exp.Anonymous — proves the load_extension check is by name, not node type"},
 
   {"id": "sql-dml-01", "class": "dml_insert", "expect": "reject", "input": "INSERT INTO orders (id) VALUES (1)", "note": "plain insert"},
   {"id": "sql-dml-02", "class": "dml_insert", "expect": "reject", "input": "INSERT INTO orders SELECT * FROM staging", "note": "insert-select — write wrapped around a select"},
@@ -28,6 +29,10 @@
 
   {"id": "sql-multi-01", "class": "multi_statement", "expect": "reject", "input": "SELECT 1; DROP TABLE orders", "note": "select then ddl"},
   {"id": "sql-multi-02", "class": "multi_statement", "expect": "reject", "input": "SELECT 1 ; ; DROP TABLE orders", "note": "empty statement between"},
+
+  {"id": "sql-exec-01", "class": "code_execution", "expect": "reject", "input": "SELECT load_extension('/tmp/evil.so')", "note": "loads and runs a native library from a valid SELECT"},
+  {"id": "sql-exec-02", "class": "code_execution", "expect": "reject", "input": "SELECT * FROM orders WHERE load_extension('/tmp/evil.so') IS NULL", "note": "nested in a predicate"},
+  {"id": "sql-exec-03", "class": "code_execution", "expect": "reject", "input": "SELECT \"LOAD_EXTENSION\"('/tmp/evil.so', 'init')", "note": "quoted, uppercase, entry-point form — SQLite still runs it as load_extension"},
 
   {"id": "sql-into-01", "class": "select_into", "expect": "reject", "input": "SELECT * INTO backup FROM orders", "note": "select-into writes a table"},
 
