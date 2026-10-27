@@ -1,0 +1,13 @@
+[
+  {"id": "ident-allow-01", "class": "identifier_valid", "expect": "allow", "input": "orders_2024", "note": "letters, digits, underscore"},
+  {"id": "ident-allow-02", "class": "identifier_valid", "expect": "allow", "input": "_private", "note": "leading underscore is legal"},
+
+  {"id": "ident-inject-01", "class": "identifier_injection", "expect": "reject", "input": "orders; DROP TABLE x", "note": "statement terminator"},
+  {"id": "ident-inject-02", "class": "identifier_injection", "expect": "reject", "input": "orders\" ; DROP TABLE x --", "note": "double-quote break-out of the quoted identifier"},
+  {"id": "ident-inject-03", "class": "identifier_injection", "expect": "reject", "input": "main.orders", "note": "schema qualification"},
+  {"id": "ident-inject-04", "class": "identifier_injection", "expect": "reject", "input": "orders x", "note": "embedded space / aliasing"},
+
+  {"id": "ident-shape-01", "class": "identifier_shape", "expect": "reject", "input": "", "note": "empty — the `not name` branch"},
+  {"id": "ident-shape-02", "class": "identifier_shape", "expect": "reject", "input": "2024_orders", "note": "leading digit"},
+  {"id": "ident-shape-03", "class": "identifier_shape", "expect": "reject", "input": "orders\n", "note": "trailing newline — Python's $ matches before it, so this needs \\Z"}
+]

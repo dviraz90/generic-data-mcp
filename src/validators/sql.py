@@ -4,11 +4,13 @@ import re
 
 import sqlglot
 from sqlglot import exp
-from sqlglot.errors import ParseError as SqlglotParseError
+from sqlglot.errors import SqlglotError
 
 from src.exceptions import SQLValidationError
 
-_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+# \Z, not $: Python's $ also matches just before a trailing newline, so
+# "orders\n" satisfied the pattern and was returned unchanged as a table name.
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\Z")
 
 _ALLOWED_ROOT_TYPES = (exp.Select, exp.With, exp.Union, exp.Subquery)
 
@@ -70,7 +72,11 @@ class SQLValidator:
 
         try:
             statements = [s for s in sqlglot.parse(stripped, read="sqlite") if s is not None]
-        except SqlglotParseError as e:
+        except SqlglotError as e:
+            # SqlglotError, not ParseError: an unterminated quote (e.g. the classic
+            # "'; DROP TABLE x; --" fragment) raises TokenError, a sibling of
+            # ParseError. Catching only ParseError let that escape as a raw sqlglot
+            # exception instead of the recovery-oriented message tools promise.
             raise SQLValidationError(f"Could not parse SQL: {e}") from e
 
         if len(statements) != 1:
