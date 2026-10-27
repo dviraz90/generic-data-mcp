@@ -4,6 +4,7 @@ import os
 import re
 import webbrowser
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.utils import secure_filename
@@ -16,6 +17,12 @@ _STATIC_DIR = Path(__file__).parent / "static"
 _MAX_UPLOAD_BYTES = 200 * 1024 * 1024  # 200 MB
 _TABLE_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _DEFAULT_PORT = 8765
+# Hostnames the console answers to. Binding to 127.0.0.1 stops other machines
+# from connecting, but not other *websites*: a page on evil.example can rebind
+# its DNS to 127.0.0.1 and reach this server as "same origin", or post a form to
+# it. Checking Host defeats the first, checking Origin defeats the second.
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+_STATE_CHANGING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 
 def _sanitize_table_name(raw: str) -> str:
@@ -30,6 +37,15 @@ def _sanitize_table_name(raw: str) -> str:
     if cleaned and cleaned[0].isdigit():
         cleaned = "_" + cleaned
     return cleaned if _TABLE_NAME_RE.fullmatch(cleaned) else ""
+
+
+def _hostname(netloc: str) -> str:
+    """Lowercased hostname from a "host[:port]" or "[v6]:port" string."""
+    return (urlsplit(f"//{netloc}").hostname or "").lower()
+
+
+def _forbidden(error: str):
+    return jsonify({"success": False, "error": error}), 403
 
 
 def _upload_dir_for(config: Config) -> Path:
@@ -57,6 +73,30 @@ def create_app(
     app = Flask(__name__, static_folder=None)
     app.config["MAX_CONTENT_LENGTH"] = _MAX_UPLOAD_BYTES
     app.config["UPLOAD_DIR"] = upload_dir
+
+    @app.before_request
+    def _reject_foreign_requests():
+        # DNS rebinding: the browser sends the attacker's hostname even though the
+        # connection lands on 127.0.0.1.
+        if _hostname(request.host) not in _LOOPBACK_HOSTS:
+            return _forbidden(
+                f"Host '{request.host}' is not allowed. Open the console at "
+                "http://127.0.0.1 or http://localhost."
+            )
+        # CSRF: browsers attach Origin to cross-site POSTs, including the plain
+        # multipart forms that need no CORS preflight. It must match this server
+        # exactly, port included, or another local app (localhost:3000) could post
+        # here too. Requests with no Origin at all (curl, scripts) are not a browser
+        # being tricked, so they pass; "null" (sandboxed iframes) does not.
+        origin = request.headers.get("Origin")
+        if request.method in _STATE_CHANGING_METHODS and origin is not None:
+            parts = urlsplit(origin)
+            if parts.scheme != "http" or parts.netloc.lower() != request.host.lower():
+                return _forbidden(
+                    f"Cross-origin request from '{origin}' rejected. Use the console "
+                    "page itself to upload or query."
+                )
+        return None
 
     def _respond(result):
         status = 200 if result.success else 400

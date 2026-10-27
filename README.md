@@ -231,7 +231,9 @@ tests/
 A local **ingestion console** — drag-and-drop upload (including XLSX), browse loaded datasets,
 preview schemas, and run SELECT queries — for humans, over plain HTTP on `127.0.0.1`. It shares
 the same SQLite DB and `data/` tree as the MCP server, but is not part of the agent-facing tool
-surface; the MCP protocol above is unchanged by its presence.
+surface; the MCP protocol above is unchanged by its presence. It answers only to `127.0.0.1` /
+`localhost` and rejects uploads and queries posted from any other origin, so another website
+open in your browser can't read your data or plant files in it.
 
 ```bash
 pip install -e ".[ui]"

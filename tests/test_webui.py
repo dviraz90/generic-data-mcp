@@ -126,3 +126,60 @@ def test_index_served(client):
     res = client.get("/")
     assert res.status_code == 200
     assert b"Ingestion Console" in res.data
+
+
+# --- Host / Origin checks ---------------------------------------------------
+# The console binds to 127.0.0.1, which keeps other machines out but not other
+# websites the user has open. These reproduce the two browser attacks.
+
+
+@pytest.mark.parametrize("host", ["evil.example", "evil.example:8765", "127.0.0.1.evil.example"])
+def test_rejects_foreign_host_header(client, host):
+    """DNS rebinding: the connection lands on 127.0.0.1 but Host names the attacker."""
+    response = client.get("/api/datasets", headers={"Host": host})
+    assert response.status_code == 403
+    assert response.get_json()["success"] is False
+
+
+@pytest.mark.parametrize("host", ["127.0.0.1:8765", "localhost:8765", "[::1]:8765", "LOCALHOST"])
+def test_accepts_loopback_host_header(client, host):
+    assert client.get("/api/datasets", headers={"Host": host}).status_code == 200
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "https://evil.example",
+        "http://localhost:3000",  # another local app, different port
+        "https://localhost",  # right host, wrong scheme
+        "null",  # sandboxed iframe / data: URL
+    ],
+)
+def test_rejects_cross_origin_upload(client, origin):
+    """CSRF: a plain multipart form needs no preflight, so the server must check Origin."""
+    response = client.post(
+        "/api/upload",
+        headers={"Host": "127.0.0.1:8765", "Origin": origin},
+        data={"file": (io.BytesIO(b"a,b\n1,2\n"), "planted.csv"), "table_name": "planted"},
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 403
+    # Nothing was planted.
+    names = [d["table_name"] for d in client.get("/api/datasets").get_json()["datasets"]]
+    assert "planted" not in names
+
+
+def test_accepts_same_origin_upload(client):
+    """The console page itself posts with Origin == its own address."""
+    response = client.post(
+        "/api/upload",
+        headers={"Host": "127.0.0.1:8765", "Origin": "http://127.0.0.1:8765"},
+        data={"file": (io.BytesIO(b"a,b\n1,2\n"), "mine.csv"), "table_name": "mine"},
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 200
+
+
+def test_accepts_post_without_origin(client):
+    """curl and scripts send no Origin; they are not a browser being tricked."""
+    assert _upload_orders(client).status_code == 200
