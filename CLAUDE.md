@@ -24,9 +24,14 @@ python -m pytest tests/ -v
 
 # Run a single test
 python -m pytest tests/test_e2e.py::test_ingest_then_query -v
+
+# Lint, format and type-check (same pinned versions CI uses; install with ".[dev]")
+ruff check src tests
+ruff format --check src tests   # drop --check to apply formatting
+mypy                            # strict, over src/ (configured in pyproject.toml)
 ```
 
-No linter is configured. No build step is needed beyond `pip install -e .`.
+CI runs all of the above plus the tests on Python 3.11–3.13, `pip-audit`, and a `docker build`. No build step is needed beyond `pip install -e .`.
 
 ## Architecture
 
@@ -59,7 +64,8 @@ Both faces map a `ToolResult` → their transport's response the same way, and s
 |---|---|---|
 | `MCP_DB_PATH` | `./db/store.db` | SQLite file location — must be outside every `MCP_ALLOWED_DIRS` entry; startup fails otherwise |
 | `MCP_ALLOWED_DIRS` | `./data` | Colon-separated list of directories `ingest_file` may read from. The GUI saves uploads into `<first allowed dir>/uploads/`. |
-| `MCP_UI_PORT` | `8765` | Port the local upload GUI (`generic-data-mcp-ui`) binds on `127.0.0.1`. |
+| `MCP_UI_PORT` | `8765` | Port the local upload GUI (`generic-data-mcp-ui`) binds on. |
+| `MCP_UI_HOST` | `127.0.0.1` | Interface the GUI binds. Only set to `0.0.0.0` inside a container whose port is published to host loopback (see `docker-compose.yml`). |
 
 ## Adding a New Parser
 

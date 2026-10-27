@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import sqlite3
 import threading
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
+from typing import Any
 
-from src.storage.ingest import DataIngestor
 from src.storage.authorizer import QueryAuthorizer
+from src.storage.ingest import DataIngestor
 from src.storage.metadata import DatasetInfo, MetadataStore
 from src.storage.query import QueryExecutor, QueryResult
 from src.storage.search import SearchIndex
@@ -63,12 +64,12 @@ class SQLiteStore:
         with self._write_lock:
             return self.metadata.list_all()
 
-    def describe_table(self, table_name: str) -> tuple[TableSchema, list[dict]]:
+    def describe_table(self, table_name: str) -> tuple[TableSchema, list[dict[str, Any]]]:
         with self._write_lock:
             schema = self.tables.get_schema(table_name)
             cursor = self._connection.execute(f'SELECT * FROM "{table_name}" LIMIT 5')
             columns = [d[0] for d in cursor.description]
-            sample_rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+            sample_rows = [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]
             return schema, sample_rows
 
     def query(self, sql: str) -> QueryResult:
@@ -79,7 +80,7 @@ class SQLiteStore:
         with self._write_lock:
             return self.search_index.enable(table_name, columns)
 
-    def search(self, table_name: str, query: str, limit: int = 50) -> list[dict]:
+    def search(self, table_name: str, query: str, limit: int = 50) -> list[dict[str, Any]]:
         with self._write_lock:
             return self.search_index.search(table_name, query, limit)
 

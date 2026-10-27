@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from src.exceptions import GenericDataMCPError
 from src.storage.sqlite_store import SQLiteStore
@@ -13,7 +13,7 @@ class DescribeTableTool(BaseTool):
         "Show the column names/types and up to 5 sample rows for a loaded table. "
         "Call this before writing a query if you don't know the schema."
     )
-    input_schema = {
+    input_schema: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {"table_name": {"type": "string"}},
         "required": ["table_name"],

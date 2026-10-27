@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 import time
 from dataclasses import dataclass
+from typing import Any
 
 from src.exceptions import QueryTimeoutError, SQLValidationError
 from src.validators.sql import SQLValidator
@@ -16,7 +17,7 @@ _PROGRESS_INTERVAL = 10_000
 @dataclass(frozen=True)
 class QueryResult:
     columns: list[str]
-    rows: list[tuple]
+    rows: list[tuple[Any, ...]]
     truncated: bool
 
 

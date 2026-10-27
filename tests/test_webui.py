@@ -14,6 +14,7 @@ from src.tools import (
     ToolRegistry,
 )
 from src.validators.path import PathValidator
+from src.webui import server as webui_server
 from src.webui.server import create_app
 
 
@@ -109,9 +110,7 @@ def test_query_select_returns_rows(client):
 
 def test_query_non_select_rejected(client):
     _upload_orders(client)
-    res = client.post(
-        "/api/query", json={"sql": "DROP TABLE orders"}, headers=_SAME_ORIGIN
-    )
+    res = client.post("/api/query", json={"sql": "DROP TABLE orders"}, headers=_SAME_ORIGIN)
     assert res.status_code == 400
     body = res.get_json()
     assert body["success"] is False
@@ -166,7 +165,9 @@ def test_query_with_foreign_origin_rejected(client):
     assert res.status_code == 403
 
 
-@pytest.mark.parametrize("host", ["evil.example", "rebind.evil.example:8765", "127.0.0.1.evil.example"])
+@pytest.mark.parametrize(
+    "host", ["evil.example", "rebind.evil.example:8765", "127.0.0.1.evil.example"]
+)
 def test_foreign_host_rejected_on_reads(client, host):
     res = client.get("/api/datasets", headers={"Host": host})
     assert res.status_code == 403
@@ -210,7 +211,9 @@ def test_page_has_no_inline_script_style_or_innerhtml(client):
     assert 'style="' not in html
     assert "onclick=" not in html
     assert "</script>" in html and "<script src=" in html
-    inline = [s for s in html.split("<script")[1:] if s.split(">", 1)[1].split("</script>")[0].strip()]
+    inline = [
+        s for s in html.split("<script")[1:] if s.split(">", 1)[1].split("</script>")[0].strip()
+    ]
     assert inline == []
     assert "innerHTML" not in client.get("/static/app.js").get_data(as_text=True)
 
@@ -231,7 +234,10 @@ def test_same_name_upload_does_not_overwrite(client, tmp_path):
     assert first.status_code == 200 and second.status_code == 200
     assert (uploads / "dup.csv").read_text() == "a,b\n1,first\n"
     assert len(list(uploads.glob("dup*.csv"))) == 2
-    sources = {d["table_name"]: d["source_path"] for d in client.get("/api/datasets").get_json()["datasets"]}
+    sources = {
+        d["table_name"]: d["source_path"]
+        for d in client.get("/api/datasets").get_json()["datasets"]
+    }
     assert sources["one"] != sources["two"]
 
 
@@ -242,3 +248,24 @@ def test_failed_ingest_removes_saved_file(client, tmp_path):
     assert res.status_code == 400
     assert not (uploads / "again.csv").exists()
     assert (uploads / "ok.csv").exists()
+
+
+@pytest.mark.parametrize(
+    ("env", "expected_host"),
+    [({}, "127.0.0.1"), ({"MCP_UI_HOST": "0.0.0.0"}, "0.0.0.0")],  # noqa: S104
+)
+def test_main_binds_loopback_unless_host_overridden(monkeypatch, tmp_path, env, expected_host):
+    monkeypatch.setenv("MCP_DB_PATH", str(tmp_path / "db" / "store.db"))
+    monkeypatch.setenv("MCP_ALLOWED_DIRS", str(tmp_path / "data"))
+    monkeypatch.delenv("MCP_UI_HOST", raising=False)
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setattr(webui_server.webbrowser, "open", lambda _url: True)
+    bound = {}
+    monkeypatch.setattr(
+        webui_server.Flask, "run", lambda _self, host, port: bound.update(host=host, port=port)
+    )
+
+    webui_server.main()
+
+    assert bound == {"host": expected_host, "port": 8765}

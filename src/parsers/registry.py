@@ -12,7 +12,7 @@ from src.parsers.xlsx import XLSXParser
 class ParserRegistry:
     """Resolves a file path to the parser registered for its extension."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._parsers: dict[str, BaseParser] = {}
         for parser in (
             CSVParser(),

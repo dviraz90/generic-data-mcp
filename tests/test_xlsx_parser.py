@@ -1,5 +1,7 @@
 import openpyxl
+import pytest
 
+from src.exceptions import ParseError
 from src.parsers.xlsx import XLSXParser
 
 
@@ -66,8 +68,6 @@ def test_trailing_empty_rows_are_skipped(tmp_path):
 
 
 def test_empty_sheet_raises_parse_error(tmp_path):
-    from src.exceptions import ParseError
-
     xlsx_path = tmp_path / "empty.xlsx"
     _write_workbook(xlsx_path, [])
 
@@ -84,17 +84,11 @@ def test_oversized_uncompressed_workbook_rejected(tmp_path):
     xlsx_path = tmp_path / "big.xlsx"
     _write_workbook(xlsx_path, [["a"], ["x" * 1000]])
 
-    import pytest
-    from src.exceptions import ParseError
-
     with pytest.raises(ParseError, match="Export the sheet to CSV"):
         list(XLSXParser(max_uncompressed_bytes=100).parse(xlsx_path))
 
 
 def test_suspicious_compression_ratio_rejected(tmp_path):
-    import pytest
-    from src.exceptions import ParseError
-
     xlsx_path = tmp_path / "bomb.xlsx"
     _write_workbook(xlsx_path, [["a"], ["x" * 100_000]])
     parser = XLSXParser(max_ratio=5)
@@ -104,10 +98,7 @@ def test_suspicious_compression_ratio_rejected(tmp_path):
 
 
 def test_corrupt_zip_gives_parse_error(tmp_path):
-    import pytest
-    from src.exceptions import ParseError
-
     bad = tmp_path / "bad.xlsx"
     bad.write_bytes(b"not a zip")
-    with pytest.raises(ParseError, match="not a valid .xlsx"):
+    with pytest.raises(ParseError, match=r"not a valid \.xlsx"):
         list(XLSXParser().parse(bad))

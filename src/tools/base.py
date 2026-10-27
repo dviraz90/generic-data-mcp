@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, ClassVar
 
 
 @dataclass
@@ -18,11 +18,11 @@ class ToolResult:
     error: str | None = None
 
     @classmethod
-    def ok(cls, **data: Any) -> "ToolResult":
+    def ok(cls, **data: Any) -> ToolResult:
         return cls(success=True, data=data)
 
     @classmethod
-    def fail(cls, error: str) -> "ToolResult":
+    def fail(cls, error: str) -> ToolResult:
         return cls(success=False, error=error)
 
     def to_dict(self) -> dict[str, Any]:
@@ -36,7 +36,7 @@ class BaseTool(ABC):
 
     name: str
     description: str
-    input_schema: dict[str, Any]
+    input_schema: ClassVar[dict[str, Any]]
 
     @abstractmethod
     def execute(self, arguments: dict[str, Any]) -> ToolResult:
@@ -59,5 +59,5 @@ class ToolRegistry:
             return ToolResult.fail(f"Unknown tool '{name}'. Available tools: {available}.")
         try:
             return tool.execute(arguments)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- any tool failure becomes a ToolResult the LLM can recover from
             return ToolResult.fail(f"{type(e).__name__}: {e}")

@@ -6,7 +6,6 @@ list of cases to keep in sync.
 """
 
 import pytest
-
 from evals.harness import load_cases, run_all, summarize
 
 _TARGETS = ("sql", "identifier", "path")

@@ -12,7 +12,7 @@ RUN useradd --uid 1000 --create-home --shell /usr/sbin/nologin mcp
 WORKDIR /app
 COPY pyproject.toml ./
 COPY src/ ./src/
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir ".[ui]"
 
 # /data  -- user files (ingest_file reads from here)
 # /db    -- SQLite DB on a separate volume, outside the ingest-allowed tree

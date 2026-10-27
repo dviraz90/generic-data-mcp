@@ -22,7 +22,7 @@ def test_concurrent_ingests_of_different_tables_all_succeed(store):
     with ThreadPoolExecutor(max_workers=8) as pool:
         list(pool.map(lambda n: store.ingest(n, f"{n}.csv", _rows(3000)), names))
     counts = {d.table_name: d.row_count for d in store.list_datasets()}
-    assert counts == {n: 3000 for n in names}
+    assert counts == dict.fromkeys(names, 3000)
     for n in names:
         assert store.query(f'SELECT COUNT(*) FROM "{n}"').rows == [(3000,)]
 
