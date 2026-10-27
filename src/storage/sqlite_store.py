@@ -6,7 +6,7 @@ from typing import Iterator
 
 from src.storage.ingest import DataIngestor
 from src.storage.metadata import DatasetInfo, MetadataStore
-from src.storage.query import QueryExecutor, QueryResult
+from src.storage.query import DEFAULT_TIMEOUT_SECONDS, QueryExecutor, QueryResult
 from src.storage.search import SearchIndex
 from src.storage.tables import TableManager
 from src.storage.types import TableSchema, TypeInferrer
@@ -21,7 +21,7 @@ class SQLiteStore:
     connection. Tools depend only on this façade, never on sqlite3 directly.
     """
 
-    def __init__(self, db_path: Path):
+    def __init__(self, db_path: Path, query_timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS):
         db_path.parent.mkdir(parents=True, exist_ok=True)
         self._connection = sqlite3.connect(str(db_path), check_same_thread=False)
         self._connection.execute("PRAGMA journal_mode=WAL;")
@@ -30,7 +30,9 @@ class SQLiteStore:
         self.tables = TableManager(self._connection)
         self.metadata = MetadataStore(self._connection)
         self.ingestor = DataIngestor(self._connection, self.tables, self.metadata, TypeInferrer())
-        self.query_executor = QueryExecutor(self._connection, SQLValidator())
+        self.query_executor = QueryExecutor(
+            self._connection, SQLValidator(), timeout_seconds=query_timeout_seconds
+        )
         self.search_index = SearchIndex(self._connection, self.tables)
 
     def ingest(

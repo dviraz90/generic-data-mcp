@@ -2,18 +2,18 @@
 
 An MCP server for querying data files, built on the assumption that the model is untrusted.
 Point it at a directory; the agent gets SQL and keyword search over it — with no code execution,
-no writes, and no path escape. All three are measured: 42 adversarial inputs across 24 attack
+no writes, and no path escape. All three are measured: 44 adversarial inputs across 26 attack
 classes, all rejected, checked on every push.
 
 It ingests structured data files (CSV, TSV, pipe-delimited, JSON, JSONL) into SQLite and exposes them as queryable tools for an LLM. The user asks questions in natural language; the LLM composes the tools to answer.
 
 ## Findings
 
-42/42 adversarial inputs rejected and 14/14 legitimate inputs accepted, across DML/DDL,
+44/44 adversarial inputs rejected and 16/16 legitimate inputs accepted, across DML/DDL,
 `PRAGMA`/`ATTACH`, `load_extension()`, multi-statement, `SELECT … INTO`, identifier injection,
-and `..`/symlink path escape. Offline, deterministic, under a second: `python -m evals.run`
-(see [`evals/`](evals/)).
-Building the corpus found three validator gaps, all fixed. This covers the classes we listed, not
+`..`/symlink path escape, and runaway queries. Offline and deterministic, in about a second:
+`python -m evals.run` (see [`evals/`](evals/)).
+Building the corpus found four gaps, all fixed. This covers the classes we listed, not
 the ones we didn't.
 
 ## Tools
@@ -23,7 +23,7 @@ the ones we didn't.
 | `ingest_file` | Parse a file, infer types, create a SQLite table |
 | `list_datasets` | Show every loaded table with row counts and source paths |
 | `describe_table` | Schema + sample rows for one table |
-| `query` | Run a read-only SELECT (single statement, capped at 1000 rows) |
+| `query` | Run a read-only SELECT (single statement, capped at 1000 rows and 10 seconds) |
 | `search` | Enable FTS5 on (table, columns), then run keyword searches |
 
 ## Design notes

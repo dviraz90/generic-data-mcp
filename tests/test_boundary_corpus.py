@@ -9,7 +9,7 @@ import pytest
 
 from evals.harness import load_cases, run_all, summarize
 
-_TARGETS = ("sql", "identifier", "path")
+_TARGETS = ("sql", "identifier", "path", "query")
 
 # Run once at import so every case becomes its own test node — a failure names
 # the offending case id rather than one opaque aggregate assertion.

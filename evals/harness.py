@@ -19,7 +19,8 @@ from tempfile import TemporaryDirectory
 from typing import Callable, Iterator
 
 from src.config import Config
-from src.exceptions import PathValidationError, SQLValidationError
+from src.exceptions import PathValidationError, QueryTimeoutError, SQLValidationError
+from src.storage.sqlite_store import SQLiteStore
 from src.validators.path import PathValidator
 from src.validators.sql import SQLValidator, validate_identifier
 
@@ -33,7 +34,13 @@ _EXPECTED_ERRORS: dict[str, type[Exception]] = {
     "sql": SQLValidationError,
     "identifier": SQLValidationError,
     "path": PathValidationError,
+    "query": QueryTimeoutError,
 }
+
+# Budget for the `query` cases. They run a real query against a real store, so
+# this is wall-clock time; it only needs to be long enough that the bounded
+# allow-cases finish, and short enough that the runaway ones keep CI fast.
+_QUERY_TIMEOUT_SECONDS = 0.5
 
 
 @dataclass(frozen=True)
@@ -183,6 +190,16 @@ def run_all() -> list[Outcome]:
                 target=case.target,
             )
             outcomes.append(_run(rendered, sandbox.validator.validate))
+
+    # The validator passes these — they are valid read-only SELECTs. What stops the
+    # runaway ones is the executor's deadline, so they run against a live store.
+    with TemporaryDirectory() as tmp:
+        store = SQLiteStore(Path(tmp) / "store.db", query_timeout_seconds=_QUERY_TIMEOUT_SECONDS)
+        try:
+            for case in load_cases("query"):
+                outcomes.append(_run(case, store.query))
+        finally:
+            store.close()
 
     return outcomes
 

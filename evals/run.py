@@ -5,7 +5,7 @@
     python -m evals.run --out report.json  # additionally write a JSON report
 
 Nothing is written unless --out names a path: the run is deterministic and takes
-under a second, so a committed copy of its output would only go stale. Exit
+about a second, so a committed copy of its output would only go stale. Exit
 status is non-zero if any case behaved unexpectedly.
 
 No API key, no network, no configuration. See evals/README.md.

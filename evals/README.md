@@ -4,7 +4,7 @@ The README claims the server gives an agent SQL and keyword search over a direct
 "with no code execution, no writes, and no path escape." That is a claim about this
 repo's validators, so it can be measured directly. This directory measures it.
 
-**No API key, no network, no model.** The run is deterministic and takes well under a
+**No API key, no network, no model.** The run is deterministic and takes about a
 second.
 
 ## Running it
@@ -22,22 +22,22 @@ python -m evals.run --out report.json   # additionally write a JSON report
 Exit status is non-zero if any case behaved unexpectedly, so it works in a pipeline.
 
 Nothing is written unless you ask for it, and no run output is committed. The run is
-deterministic and takes under a second, and `tests/test_boundary_corpus.py` asserts the
+deterministic and takes about a second, and `tests/test_boundary_corpus.py` asserts the
 same corpus on every push — so the reproduction is the artifact, and a checked-in copy
 of the numbers would only go stale.
 
 ## What the numbers mean
 
 ```
-adversarial inputs rejected : 42/42
-legitimate inputs accepted  : 14/14
+adversarial inputs rejected : 44/44
+legitimate inputs accepted  : 16/16
 ```
 
 - **adversarial inputs rejected** — inputs marked `"expect": "reject"` that the
   validators refused. This is the security number.
 - **legitimate inputs accepted** — inputs marked `"expect": "allow"` that passed.
   This is the number that keeps the first one honest: a validator that rejects
-  *everything* would score 42/42 on the first line while being useless. Both must
+  *everything* would score 44/44 on the first line while being useless. Both must
   be perfect for the result to mean anything.
 - **off-contract rejections** — inputs that were rejected, but by an exception type
   other than the one the validator documents (`SQLValidationError` /
@@ -54,6 +54,7 @@ Per-class counts show which attack families are covered and how densely.
 | SQL | `SQLValidator` (`src/validators/sql.py`) | `dml_insert`, `dml_update`, `dml_delete`, `dml_replace`, `dml_upsert`, `ddl_drop`, `ddl_create`, `ddl_alter`, `pragma`, `attach`, `maintenance`, `code_execution`, `multi_statement`, `select_into`, `comment_smuggling`, `unparseable`, `empty` |
 | Identifiers | `validate_identifier` (`src/validators/sql.py`) | `identifier_injection`, `identifier_shape` |
 | Paths | `PathValidator` (`src/validators/path.py`) | `traversal`, `symlink`, `absolute`, `store_readback`, `path_shape` |
+| Query cost | `QueryExecutor` deadline (`src/storage/query.py`) | `unbounded_recursion`, `cartesian_explosion` |
 
 Path cases run against a real temporary directory tree — including an actual symlink
 pointing out of the sandbox — because `PathValidator` resolves and then stats the
@@ -103,7 +104,7 @@ What it is good for: it makes the README's claim checkable by a stranger in abou
 seconds, it names exactly which classes are covered, and it turns a regression into a
 red CI run instead of a silent hole.
 
-Building this corpus found three real gaps, all now fixed and covered:
+Building this corpus found four real gaps, all now fixed and covered:
 
 - `SQLValidator` caught sqlglot's `ParseError` but not its sibling `TokenError`, so
   `'; DROP TABLE orders; --` was rejected with a raw third-party exception instead of a
@@ -117,5 +118,10 @@ Building this corpus found three real gaps, all now fixed and covered:
   failed at runtime with `not authorized` — but "no code execution" was resting on a
   runtime setting rather than on the validator. It is now rejected by name, which also
   covers the quoted and bracketed spellings SQLite accepts.
+- An unbounded recursive CTE is a valid read-only SELECT, and it never returns. The
+  1000-row cap bounds what comes back, not the work done, so it ran forever on the
+  store's one shared connection and hung every tool. Queries now run under a deadline
+  (10s by default) enforced by SQLite's progress handler. The `query` cases run against
+  a live store with a 0.5s budget, which is why the whole run takes about a second.
 
 That is the kind of thing this catches — not the kind of thing that proves absence.

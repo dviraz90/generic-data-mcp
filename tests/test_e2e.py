@@ -146,3 +146,55 @@ def test_search_before_enable_fails(workspace):
         "search", {"action": "search", "table_name": "orders", "query": "fast"}
     )
     assert not result.success
+
+
+def test_runaway_query_is_stopped_with_a_recoverable_error(tmp_path):
+    """A valid SELECT that never finishes must not hold the shared connection forever."""
+    store = SQLiteStore(tmp_path / "store.db", query_timeout_seconds=0.2)
+    registry = ToolRegistry([QueryTool(store)])
+
+    result = registry.call(
+        "query",
+        {"sql": "WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM c) SELECT count(*) FROM c"},
+    )
+
+    assert not result.success
+    assert "stopped after 0.2s" in result.error
+    # The connection is still usable, and the progress handler was cleared.
+    assert registry.call("query", {"sql": "SELECT 1"}).success
+
+
+@pytest.mark.parametrize("limit", [0, -1, "10", True])
+def test_search_rejects_invalid_limit(workspace, limit):
+    registry, csv_path = workspace
+    registry.call("ingest_file", {"path": str(csv_path), "table_name": "orders"})
+    registry.call("search", {"action": "enable", "table_name": "orders", "columns": ["note"]})
+
+    result = registry.call(
+        "search", {"action": "search", "table_name": "orders", "query": "door", "limit": limit}
+    )
+
+    assert not result.success
+    assert "positive integer" in result.error
+
+
+def test_search_limit_is_capped(workspace, monkeypatch):
+    registry, csv_path = workspace
+    registry.call("ingest_file", {"path": str(csv_path), "table_name": "orders"})
+    registry.call("search", {"action": "enable", "table_name": "orders", "columns": ["note"]})
+
+    seen = {}
+    store = registry._tools["search"]._store
+    real_search = store.search
+
+    def spy(table_name, query, limit=50):
+        seen["limit"] = limit
+        return real_search(table_name, query, limit)
+
+    monkeypatch.setattr(store, "search", spy)
+    result = registry.call(
+        "search", {"action": "search", "table_name": "orders", "query": "door", "limit": 10**9}
+    )
+
+    assert result.success
+    assert seen["limit"] == 1000

@@ -11,7 +11,8 @@ class QueryTool(BaseTool):
     name = "query"
     description = (
         "Run a single read-only SELECT statement against the loaded tables. "
-        "Results are capped at 1000 rows. Only SELECT/WITH...SELECT/UNION are allowed; "
+        "Results are capped at 1000 rows, and a query that runs longer than 10 seconds is "
+        "stopped. Only SELECT/WITH...SELECT/UNION are allowed; "
         "call describe_table first if you don't know the schema."
     )
     input_schema = {
