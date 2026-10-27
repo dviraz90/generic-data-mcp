@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Iterator
 
 from src.storage.ingest import DataIngestor
+from src.storage.authorizer import QueryAuthorizer
 from src.storage.metadata import DatasetInfo, MetadataStore
 from src.storage.query import QueryExecutor, QueryResult
 from src.storage.search import SearchIndex
@@ -27,10 +28,18 @@ class SQLiteStore:
         self._connection.execute("PRAGMA journal_mode=WAL;")
         self._connection.execute("PRAGMA busy_timeout=5000;")
 
+        # Queries run on their own read-only connection with an authorizer, so the
+        # SQL validator is not the only thing standing between a SELECT and a write.
+        self._query_connection = sqlite3.connect(
+            f"file:{db_path}?mode=ro", uri=True, check_same_thread=False
+        )
+        self._query_connection.execute("PRAGMA busy_timeout=5000;")
+        self._query_connection.set_authorizer(QueryAuthorizer())
+
         self.tables = TableManager(self._connection)
         self.metadata = MetadataStore(self._connection)
         self.ingestor = DataIngestor(self._connection, self.tables, self.metadata, TypeInferrer())
-        self.query_executor = QueryExecutor(self._connection, SQLValidator())
+        self.query_executor = QueryExecutor(self._query_connection, SQLValidator())
         self.search_index = SearchIndex(self._connection, self.tables)
 
     def ingest(
@@ -58,4 +67,5 @@ class SQLiteStore:
         return self.search_index.search(table_name, query, limit)
 
     def close(self) -> None:
+        self._query_connection.close()
         self._connection.close()
