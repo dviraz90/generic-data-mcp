@@ -179,7 +179,7 @@ JSON examples below.
       "args": [
         "run", "--rm", "-i",
         "--network", "none",
-        "-v", "/absolute/path/to/data:/data",
+        "-v", "/absolute/path/to/data:/data:ro",
         "-v", "/absolute/path/to/db:/db",
         "-e", "MCP_DB_PATH=/db/store.db",
         "-e", "MCP_ALLOWED_DIRS=/data",

@@ -17,7 +17,7 @@ services:
     tmpfs:
       - /tmp:size=64m,mode=1777
     volumes:
-      - ./data:/data   # user files; ingest_file reads from here
+      - ./data:/data:ro   # user files; ingest_file only reads from here
       - db-data:/db    # SQLite DB isolated from the ingest-allowed tree
     environment:
       MCP_DB_PATH: /db/store.db

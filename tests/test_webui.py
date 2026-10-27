@@ -188,3 +188,57 @@ def test_security_headers_set(client):
     assert res.headers["X-Content-Type-Options"] == "nosniff"
     assert res.headers["X-Frame-Options"] == "DENY"
     assert res.headers["Referrer-Policy"] == "no-referrer"
+
+
+def test_csp_header_set(client):
+    csp = client.get("/").headers["Content-Security-Policy"]
+    assert "default-src 'self'" in csp
+    assert "unsafe-inline" not in csp
+    assert "frame-ancestors 'none'" in csp
+
+
+def test_static_assets_served_and_confined(client):
+    assert client.get("/static/app.js").status_code == 200
+    assert client.get("/static/app.css").status_code == 200
+    assert client.get("/static/../server.py").status_code == 404
+    assert client.get("/static/%2e%2e/server.py").status_code == 404
+
+
+def test_page_has_no_inline_script_style_or_innerhtml(client):
+    html = client.get("/").get_data(as_text=True)
+    assert "<style" not in html
+    assert 'style="' not in html
+    assert "onclick=" not in html
+    assert "</script>" in html and "<script src=" in html
+    inline = [s for s in html.split("<script")[1:] if s.split(">", 1)[1].split("</script>")[0].strip()]
+    assert inline == []
+    assert "innerHTML" not in client.get("/static/app.js").get_data(as_text=True)
+
+
+def _post_csv(client, name, content, table=None):
+    data = {"file": (io.BytesIO(content), name)}
+    if table:
+        data["table_name"] = table
+    return client.post(
+        "/api/upload", data=data, content_type="multipart/form-data", headers=_SAME_ORIGIN
+    )
+
+
+def test_same_name_upload_does_not_overwrite(client, tmp_path):
+    uploads = tmp_path / "data" / "uploads"
+    first = _post_csv(client, "dup.csv", b"a,b\n1,first\n", table="one")
+    second = _post_csv(client, "dup.csv", b"a,b\n2,second\n", table="two")
+    assert first.status_code == 200 and second.status_code == 200
+    assert (uploads / "dup.csv").read_text() == "a,b\n1,first\n"
+    assert len(list(uploads.glob("dup*.csv"))) == 2
+    sources = {d["table_name"]: d["source_path"] for d in client.get("/api/datasets").get_json()["datasets"]}
+    assert sources["one"] != sources["two"]
+
+
+def test_failed_ingest_removes_saved_file(client, tmp_path):
+    uploads = tmp_path / "data" / "uploads"
+    assert _post_csv(client, "ok.csv", b"a\n1\n", table="taken").status_code == 200
+    res = _post_csv(client, "again.csv", b"a\n2\n", table="taken")  # table exists
+    assert res.status_code == 400
+    assert not (uploads / "again.csv").exists()
+    assert (uploads / "ok.csv").exists()

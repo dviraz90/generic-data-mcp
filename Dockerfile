@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
-# Pin to a digest for reproducible builds:
-#   docker pull python:3.11-slim && docker inspect python:3.11-slim --format='{{index .RepoDigests 0}}'
-FROM python:3.11-slim
+# Pinned to a digest for reproducible builds (multi-arch index for python:3.11-slim).
+# To update: docker pull python:3.11-slim && docker inspect python:3.11-slim --format='{{index .RepoDigests 0}}'
+FROM python:3.11-slim@sha256:ae952e0a57138a4317b9b61caaa19a8217c2f356803f8d7e63aad08769950937
 
 LABEL org.opencontainers.image.title="generic-data-mcp" \
       org.opencontainers.image.description="MCP server: structured files → SQLite → LLM tools"

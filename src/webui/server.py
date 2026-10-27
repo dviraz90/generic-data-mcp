@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import uuid
 import webbrowser
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -38,6 +39,23 @@ def _sanitize_table_name(raw: str) -> str:
 def _upload_dir_for(config: Config) -> Path:
     """The directory uploaded files are saved into: <first allowed dir>/uploads."""
     return config.allowed_dirs[0] / "uploads"
+
+
+def _save_unique(file, directory: Path, filename: str) -> Path:
+    """Save the upload without ever replacing an existing file.
+
+    Exclusive creation ("xb") makes the existence check and the create atomic;
+    on a name collision the file is saved under a short random suffix instead.
+    """
+    path = directory / filename
+    while True:
+        try:
+            with path.open("xb") as out:
+                file.save(out)
+            return path
+        except FileExistsError:
+            stem, suffix = Path(filename).stem, Path(filename).suffix
+            path = directory / f"{stem}-{uuid.uuid4().hex[:8]}{suffix}"
 
 
 def create_app(
@@ -91,6 +109,10 @@ def create_app(
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
+        # No inline script or style: markup injected via an ingested value can't run.
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+        )
         return response
 
     def _respond(result):
@@ -100,6 +122,11 @@ def create_app(
     @app.get("/")
     def index():
         return send_from_directory(_STATIC_DIR, "index.html")
+
+    @app.get("/static/<path:filename>")
+    def static_asset(filename: str):
+        # send_from_directory rejects paths that escape _STATIC_DIR.
+        return send_from_directory(_STATIC_DIR, filename)
 
     @app.get("/api/datasets")
     def list_datasets():
@@ -132,12 +159,14 @@ def create_app(
             return jsonify({"success": False, "error": "Could not derive a valid table name. Provide a table_name matching [A-Za-z_][A-Za-z0-9_]*."}), 400
 
         upload_dir.mkdir(parents=True, exist_ok=True)
-        saved_path = upload_dir / filename
-        file.save(str(saved_path))
+        saved_path = _save_unique(file, upload_dir, filename)
 
         result = registry.call(
             "ingest_file", {"path": str(saved_path), "table_name": table_name}
         )
+        if not result.success:
+            # Don't leave rejected files behind in the ingest-allowed directory.
+            saved_path.unlink(missing_ok=True)
         return _respond(result)
 
     return app
